@@ -1,30 +1,51 @@
 'use client';
 
-import { useState } from 'react';
-import Chat from '@/components/Chat';
+import dynamic from 'next/dynamic';
 import FrequencyMeter from '@/components/FrequencyMeter';
 
-export default function TerminalPage() {
-  const [userId] = useState(() => {
-    const randomNum = Math.floor(Math.random() * 999999).toString().padStart(6, '0');
-    return `user-${randomNum}`;
-  });
+const ChatWrapper = dynamic(() => import('@/components/ChatWrapper'), {
+  ssr: false
+});
 
+export default function TerminalPage() {
   return (
-    <div className="min-h-screen bg-black text-[#FF0000]">
-      <div className="fixed top-0 left-0 right-0 bg-black z-10 p-2 sm:p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-xs sm:text-sm opacity-50 space-y-1">
-            <div>System initialized...</div>
-            <div>User ID: {userId}</div>
+    <div className="flex flex-col min-h-screen bg-black">
+      <header className="border-b border-[#FF0000]/20 bg-black/90 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto w-full">
+          {/* System stats bar */}
+          <div className="border-b border-[#FF0000]/10 py-1.5 px-4">
+            <div className="flex justify-between items-center">
+              <div className="text-[#FF0000]/50 text-[10px] font-['Press_Start_2P']">
+                SYSTEM VERSION 2.1.0
+              </div>
+              <div className="text-[#FF0000]/50 text-[10px] font-['Press_Start_2P']">
+                SIGNAL STRENGTH: OPTIMAL
+              </div>
+            </div>
+          </div>
+          {/* Main header content */}
+          <div className="py-2.5 px-4 flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-[#FF0000] text-sm font-['Press_Start_2P'] glow-text">
+                TERMINAL
+              </h1>
+              <div className="h-4 w-px bg-[#FF0000]/20" />
+              <div className="text-[#FF0000]/70 text-[10px] font-['Press_Start_2P'] flex items-center space-x-2">
+                <span className="inline-block w-2 h-2 bg-[#FF0000] rounded-full animate-pulse" />
+                <span>ACTIVE</span>
+              </div>
+            </div>
             <FrequencyMeter />
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-6xl mx-auto p-4 sm:p-8 pt-24 sm:pt-32">
-        <Chat userId={userId} />
-      </div>
+      {/* Main content */}
+      <main className="flex-1 w-full bg-black/30">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <ChatWrapper />
+        </div>
+      </main>
     </div>
   );
 }

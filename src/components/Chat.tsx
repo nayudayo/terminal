@@ -192,7 +192,10 @@ const AsciiArtWithButton = ({ onButtonClick }: { text: string; onButtonClick: ()
     setIsTyping(false);
     setDisplayText(DOWN_PUSH_RESPONSE_ART);
     setCurrentArt(DOWN_PUSH_RESPONSE_ART);
-    window.dispatchEvent(new CustomEvent('push-meter'));
+    
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('push-meter'));
+    }
     
     setTimeout(() => {
       setCurrentArt(UP_PUSH_RESPONSE_ART);
@@ -324,6 +327,7 @@ interface CompletionStatus {
   likeComplete: boolean;
 }
 
+// Create the main component
 export default function Chat({ userId }: { userId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -339,21 +343,28 @@ export default function Chat({ userId }: { userId: string }) {
   });
 
   useEffect(() => {
-    const handleFocus = async () => {
-      // Re-check session when window gains focus
-      const event = new Event("visibilitychange");
-      document.dispatchEvent(event);
-    };
+    if (typeof window !== 'undefined') {
+      const handleFocus = async () => {
+        // Re-check session when window gains focus
+        const event = new Event("visibilitychange");
+        document.dispatchEvent(event);
+      };
 
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+      window.addEventListener('focus', handleFocus);
+      return () => window.removeEventListener('focus', handleFocus);
+    }
   }, []);
 
+  // Remove the dynamic import and handle initial state more carefully
   useEffect(() => {
+    // Only set messages once when component mounts
+    const initialTimestamp = new Date().getTime();
+    const initialMessageId = Math.random().toString(36).substring(7);
+
     const setInitialMessage = () => {
       if (session?.user) {
         setMessages([{
-          id: crypto.randomUUID(),
+          id: initialMessageId,
           content: `[SYSTEM STATUS: AUTHENTICATED]
 =============================
 
@@ -386,34 +397,24 @@ REQUIRED STEPS: [1/5]
 >COMPLETE STEPS IN SEQUENCE
 >EXACT SYNTAX REQUIRED`,
           role: 'assistant',
-          timestamp: Date.now(),
+          timestamp: initialTimestamp,
           isIntro: true,
           isAuthenticated: true
         }]);
       } else {
         setMessages([{
-          id: '0',
+          id: initialMessageId,
           role: 'assistant',
           content: INTRO_MESSAGE,
-          timestamp: Date.now(),
+          timestamp: initialTimestamp,
           isIntro: true
         }]);
       }
       setCanType(true);
     };
 
-    // Set initial message and handle visibility changes
     setInitialMessage();
-    
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        setInitialMessage();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [session]);
+  }, [session]); // Only depend on session
 
   const handleTypewriterComplete = () => {
     setCanType(true);
@@ -447,16 +448,19 @@ REQUIRED STEPS: [1/5]
     }
   };
 
-  // Update handleSubmit to use completion tracking
+  // Modify handleSubmit to use stable IDs for messages
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
+    const messageTimestamp = Date.now();
+    const messageId = crypto.randomUUID();
+
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: messageId,
       role: 'user',
       content: input,
-      timestamp: Date.now(),
+      timestamp: messageTimestamp,
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -464,11 +468,11 @@ REQUIRED STEPS: [1/5]
     setIsLoading(true);
     setIsTyping(true);
 
-    // Handle any message containing 'push' (case insensitive)
     if (input.toLowerCase().includes('push')) {
       setTimeout(() => {
+        const responseId = crypto.randomUUID();
         setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
+          id: responseId,
           role: 'assistant',
           content: UP_PUSH_RESPONSE_ART,
           timestamp: Date.now(),
@@ -478,7 +482,7 @@ REQUIRED STEPS: [1/5]
         setIsLoading(false);
         setIsTyping(false);
       }, 1000);
-      return;  // Return early to prevent API call
+      return;
     }
 
     try {
@@ -545,18 +549,20 @@ REQUIRED STEPS: [1/5]
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] sm:h-[calc(100vh-12rem)] flex flex-col bg-black text-[#FF0000]">
-      <div className="flex-1 overflow-y-auto space-y-4 hide-scrollbar">
+    <div className="flex flex-col h-[calc(100vh-10rem)] bg-transparent rounded-lg">
+      <div className="flex-1 overflow-y-auto space-y-4 hide-scrollbar p-6">
         {messages.map((message) => (
           <div key={message.id} className="font-mono text-sm sm:text-base break-words">
-            <span className="opacity-50 glow-text-subtle">
+            <span className="opacity-50 glow-text-subtle select-none" suppressHydrationWarning>
               [{new Date(message.timestamp).toLocaleTimeString()}]
             </span>{' '}
             {message.role === 'user' ? (
-              <span className="glow-text-bright">{`<${userId}> ${message.content}`}</span>
+              <span className="glow-text-bright" suppressHydrationWarning>
+                {`<${userId}> ${message.content}`}
+              </span>
             ) : (
               <div className="ml-2 sm:ml-4">
-                <span className="glow-text-bright">{`<Messenger> `}</span>
+                <span className="glow-text-bright select-none">{`<Messenger> `}</span>
                 {message.isIntro && message.showButton ? (
                   <AsciiArtWithButton 
                     text={message.content}
@@ -585,28 +591,32 @@ REQUIRED STEPS: [1/5]
           </div>
         ))}
         {isTyping && (
-          <div className="opacity-50 glow-text-subtle">
+          <div className="opacity-50 glow-text-subtle animate-pulse">
             <AsciiTypewriter text="Messenger is typing..." />
           </div>
         )}
         <div ref={endOfMessagesRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-4">
+      <form onSubmit={handleSubmit} className="border-t border-[#FF0000]/20 p-4 bg-black/30">
         <div className="flex items-center gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={!canType || isLoading}
-            className="flex-1 bg-transparent focus:outline-none disabled:opacity-50 
-                     disabled:cursor-not-allowed glow-text-input"
+            className="flex-1 bg-black/50 focus:outline-none disabled:opacity-50 
+                     disabled:cursor-not-allowed glow-text-input px-3 py-2 
+                     border border-[#FF0000]/20 rounded font-['Press_Start_2P'] text-xs"
             placeholder={canType ? "Enter message..." : "Wait for message to complete..."}
           />
           <button
             type="submit"
             disabled={!canType || isLoading}
-            className="px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed glow-text-bright"
+            className="px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed 
+                     glow-text-bright border border-[#FF0000]/20 rounded
+                     hover:bg-[#FF0000]/10 transition-colors
+                     font-['Press_Start_2P'] text-xs"
           >
             Send
           </button>

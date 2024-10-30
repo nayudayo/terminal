@@ -1,15 +1,22 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import FrequencyMeter from '@/components/FrequencyMeter';
 
+// Use dynamic import for FrequencyMeter
+const FrequencyMeter = dynamic(() => import('@/components/FrequencyMeter'), {
+  ssr: false,
+  loading: () => null
+});
+
+// Use dynamic import for ChatWrapper
 const ChatWrapper = dynamic(() => import('@/components/ChatWrapper'), {
-  ssr: false
+  ssr: false,
+  loading: () => null
 });
 
 export default function TerminalPage() {
   return (
-    <div className="flex flex-col min-h-screen bg-black">
+    <div className="flex flex-col min-h-screen bg-black" suppressHydrationWarning>
       <header className="border-b border-[#FF0000]/20 bg-black/90 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto w-full">
           {/* System stats bar */}

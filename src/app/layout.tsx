@@ -7,6 +7,7 @@ const pressStart2P = Press_Start_2P({
   weight: '400',
   subsets: ['latin'],
   variable: '--font-press-start',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -20,8 +21,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`bg-black ${pressStart2P.variable}`}>
-      <body className={`bg-black min-h-screen ${pressStart2P.className}`}>
+    <html lang="en" suppressHydrationWarning>
+      <body 
+        className={`bg-black min-h-screen ${pressStart2P.className}`}
+        suppressHydrationWarning
+      >
         <Providers>{children}</Providers>
       </body>
     </html>

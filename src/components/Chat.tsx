@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { signIn, useSession } from 'next-auth/react';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
   id: string;
@@ -327,6 +328,17 @@ interface CompletionStatus {
   likeComplete: boolean;
 }
 
+// Add this helper function at the top level
+const formatTimestamp = (timestamp: number) => {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+};
+
 // Create the main component
 export default function Chat({ userId }: { userId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -355,17 +367,15 @@ export default function Chat({ userId }: { userId: string }) {
     }
   }, []);
 
-  // Remove the dynamic import and handle initial state more carefully
+  // Initialize messages with a stable timestamp
   useEffect(() => {
-    // Only set messages once when component mounts
-    const initialTimestamp = new Date().getTime();
-    const initialMessageId = Math.random().toString(36).substring(7);
+    const initialTimestamp = Math.floor(Date.now() / 1000) * 1000; // Round to nearest second
+    const initialMessageId = '1'; // Use a stable ID for initial message
 
-    const setInitialMessage = () => {
-      if (session?.user) {
-        setMessages([{
-          id: initialMessageId,
-          content: `[SYSTEM STATUS: AUTHENTICATED]
+    if (session?.user) {
+      setMessages([{
+        id: initialMessageId,
+        content: `[SYSTEM STATUS: AUTHENTICATED]
 =============================
 
 DIGITAL BRIDGE PROTOCOL v2.1
@@ -396,25 +406,22 @@ REQUIRED STEPS: [1/5]
 
 >COMPLETE STEPS IN SEQUENCE
 >EXACT SYNTAX REQUIRED`,
-          role: 'assistant',
-          timestamp: initialTimestamp,
-          isIntro: true,
-          isAuthenticated: true
-        }]);
-      } else {
-        setMessages([{
-          id: initialMessageId,
-          role: 'assistant',
-          content: INTRO_MESSAGE,
-          timestamp: initialTimestamp,
-          isIntro: true
-        }]);
-      }
-      setCanType(true);
-    };
-
-    setInitialMessage();
-  }, [session]); // Only depend on session
+        role: 'assistant',
+        timestamp: initialTimestamp,
+        isIntro: true,
+        isAuthenticated: true
+      }]);
+    } else {
+      setMessages([{
+        id: initialMessageId,
+        role: 'assistant',
+        content: INTRO_MESSAGE,
+        timestamp: initialTimestamp,
+        isIntro: true
+      }]);
+    }
+    setCanType(true);
+  }, [session]);
 
   const handleTypewriterComplete = () => {
     setCanType(true);
@@ -448,13 +455,13 @@ REQUIRED STEPS: [1/5]
     }
   };
 
-  // Modify handleSubmit to use stable IDs for messages
+  // Modify handleSubmit to use uuidv4
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
     const messageTimestamp = Date.now();
-    const messageId = crypto.randomUUID();
+    const messageId = uuidv4();
 
     const userMessage: Message = {
       id: messageId,
@@ -470,7 +477,7 @@ REQUIRED STEPS: [1/5]
 
     if (input.toLowerCase().includes('push')) {
       setTimeout(() => {
-        const responseId = crypto.randomUUID();
+        const responseId = uuidv4();
         setMessages(prev => [...prev, {
           id: responseId,
           role: 'assistant',
@@ -501,7 +508,7 @@ REQUIRED STEPS: [1/5]
       
       if (data.action === 'CONNECT_TWITTER') {
         setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
+          id: uuidv4(),
           content: data.message,
           role: 'assistant',
           timestamp: Date.now(),
@@ -519,7 +526,7 @@ REQUIRED STEPS: [1/5]
       }
 
       const newMessage: Message = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         content: data.message,
         role: 'assistant',
         timestamp: Date.now(),
@@ -538,7 +545,7 @@ REQUIRED STEPS: [1/5]
   const handleButtonClick = () => {
     setTimeout(() => {
       setMessages(prev => [...prev, {
-        id: Date.now().toString(),
+        id: uuidv4(),
         role: 'assistant',
         content: POST_PUSH_MESSAGE,
         timestamp: Date.now(),
@@ -554,7 +561,7 @@ REQUIRED STEPS: [1/5]
         {messages.map((message) => (
           <div key={message.id} className="font-mono text-sm sm:text-base break-words">
             <span className="opacity-50 glow-text-subtle select-none" suppressHydrationWarning>
-              [{new Date(message.timestamp).toLocaleTimeString()}]
+              [{formatTimestamp(message.timestamp)}]
             </span>{' '}
             {message.role === 'user' ? (
               <span className="glow-text-bright" suppressHydrationWarning>
@@ -562,7 +569,9 @@ REQUIRED STEPS: [1/5]
               </span>
             ) : (
               <div className="ml-2 sm:ml-4">
-                <span className="glow-text-bright select-none">{`<Messenger> `}</span>
+                <span className="glow-text-bright select-none" suppressHydrationWarning>
+                  {`<Messenger> `}
+                </span>
                 {message.isIntro && message.showButton ? (
                   <AsciiArtWithButton 
                     text={message.content}

@@ -30,7 +30,7 @@ const Typewriter = ({ text, onComplete }: TypewriterProps) => {
       const timeout = setTimeout(() => {
         setDisplayText(text.slice(0, currentIndex + 1));
         setCurrentIndex(prev => prev + 1);
-      }, 30);
+      }, 5);
 
       return () => clearTimeout(timeout);
     } else {
@@ -292,7 +292,7 @@ const PostPushTypewriter = ({ text, onComplete }: { text: string; onComplete?: (
         if (typewriterRef.current) {
           typewriterRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
-      }, 30);
+      }, 5);
 
       return () => clearTimeout(timeout);
     } else {
@@ -317,6 +317,13 @@ const PostPushTypewriter = ({ text, onComplete }: { text: string; onComplete?: (
   );
 };
 
+// Add this interface to track completion status
+interface CompletionStatus {
+  mandatesComplete: boolean;
+  followComplete: boolean;
+  likeComplete: boolean;
+}
+
 export default function Chat({ userId }: { userId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -325,6 +332,11 @@ export default function Chat({ userId }: { userId: string }) {
   const [canType, setCanType] = useState(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const { data: session } = useSession();
+  const [completionStatus, setCompletionStatus] = useState<CompletionStatus>({
+    mandatesComplete: false,
+    followComplete: false,
+    likeComplete: false
+  });
 
   useEffect(() => {
     const handleFocus = async () => {
@@ -417,11 +429,32 @@ CLEARANCE: LEVEL 3
   };
 
   const scrollToBottom = () => {
-    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      endOfMessagesRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'end'
+      });
+    }, 100); // Small delay to ensure content is rendered
   };
 
   useEffect(scrollToBottom, [messages]);
 
+  // Add function to handle command completion
+  const handleCommandComplete = (command: string) => {
+    switch (command) {
+      case 'follow ptb':
+        setCompletionStatus(prev => ({ ...prev, followComplete: true }));
+        break;
+      case 'like ptb':
+        setCompletionStatus(prev => ({ ...prev, likeComplete: true }));
+        break;
+      case 'skip mandates':
+        setCompletionStatus(prev => ({ ...prev, mandatesComplete: true }));
+        break;
+    }
+  };
+
+  // Update handleSubmit to use completion tracking
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -438,32 +471,17 @@ CLEARANCE: LEVEL 3
     setIsLoading(true);
     setIsTyping(true);
 
-    if (input.toLowerCase().includes('push')) {
-      setTimeout(() => {
-        setMessages(prev => [...prev, {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: UP_PUSH_RESPONSE_ART,
-          timestamp: Date.now(),
-          isIntro: true,
-          showButton: true
-        }]);
-        setIsLoading(false);
-        setIsTyping(false);
-      }, 1000);
-      return;
-    }
-
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input.trim() }),
+        body: JSON.stringify({ 
+          message: input.trim(),
+          completionStatus // Send current completion status
+        }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
+      if (!response.ok) throw new Error('Failed to send message');
 
       const data = await response.json();
       
@@ -481,12 +499,20 @@ CLEARANCE: LEVEL 3
         return;
       }
 
-      setMessages(prev => [...prev, {
+      // Handle command completion
+      if (data.commandComplete) {
+        handleCommandComplete(input.trim().toLowerCase());
+      }
+
+      const newMessage: Message = {
         id: crypto.randomUUID(),
         content: data.message,
         role: 'assistant',
         timestamp: Date.now(),
-      }]);
+      };
+
+      setMessages(prev => [...prev, newMessage]);
+      scrollToBottom();
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -508,6 +534,18 @@ CLEARANCE: LEVEL 3
     }, 1000);
   };
 
+  // Add effect to handle visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        scrollToBottom();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   return (
     <div className="h-[calc(100vh-8rem)] sm:h-[calc(100vh-12rem)] flex flex-col bg-black text-[#FF0000]">
       <div className="flex-1 overflow-y-auto space-y-4 hide-scrollbar">
@@ -526,13 +564,14 @@ CLEARANCE: LEVEL 3
                     text={message.content}
                     onButtonClick={handleButtonClick}
                   />
-                ) : message.isIntro ? (
-                  <AsciiTypewriter 
+                ) : message.content === POST_PUSH_MESSAGE ? (
+                  <PostPushTypewriter 
                     text={message.content} 
                     onComplete={handleTypewriterComplete}
                   />
-                ) : message.content === POST_PUSH_MESSAGE ? (
-                  <PostPushTypewriter 
+                ) : message.content.includes('[') ||
+                    message.content.includes('ERROR:') ? (
+                  <AsciiTypewriter 
                     text={message.content} 
                     onComplete={handleTypewriterComplete}
                   />
@@ -548,7 +587,7 @@ CLEARANCE: LEVEL 3
         ))}
         {isTyping && (
           <div className="opacity-50 glow-text-subtle">
-            <Typewriter text="Messenger is typing..." />
+            <AsciiTypewriter text="Messenger is typing..." />
           </div>
         )}
         <div ref={endOfMessagesRef} />

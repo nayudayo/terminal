@@ -73,7 +73,6 @@ body {
     transparent 2px
   );
   pointer-events: none;
-  box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
 }
 
 /* Add these to your existing globals.css */
@@ -115,6 +114,7 @@ body {
   display: none;            /* Chrome, Safari and Opera */
 }
 
+/* Add these glow effects */
 .glow-text {
   text-shadow: 0 0 5px rgba(255, 0, 0, 0.5);
 }

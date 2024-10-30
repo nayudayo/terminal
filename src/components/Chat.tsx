@@ -10,6 +10,7 @@ interface Message {
   timestamp: number;
   isIntro?: boolean;
   showButton?: boolean;
+  isAuthenticated?: boolean;
 }
 
 interface TypewriterProps {
@@ -326,10 +327,22 @@ export default function Chat({ userId }: { userId: string }) {
   const { data: session } = useSession();
 
   useEffect(() => {
-    if (session?.user) {
-      setMessages([{
-        id: crypto.randomUUID(),
-        content: `[SYSTEM STATUS: AUTHENTICATED]
+    const handleFocus = async () => {
+      // Re-check session when window gains focus
+      const event = new Event("visibilitychange");
+      document.dispatchEvent(event);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
+  useEffect(() => {
+    const setInitialMessage = () => {
+      if (session?.user) {
+        setMessages([{
+          id: crypto.randomUUID(),
+          content: `[SYSTEM STATUS: AUTHENTICATED]
 =============================
 
 DIGITAL BRIDGE PROTOCOL v2.1
@@ -368,20 +381,34 @@ CLEARANCE: LEVEL 3
 >COMMAND LINE ACTIVE
 >AWAITING INPUT...
 >TYPE "help" FOR AVAILABLE COMMANDS`,
-        role: 'assistant',
-        timestamp: Date.now(),
-        isIntro: true
-      }]);
-    } else {
-      setMessages([{
-        id: '0',
-        role: 'assistant',
-        content: INTRO_MESSAGE,
-        timestamp: Date.now(),
-        isIntro: true
-      }]);
-    }
-    setCanType(true);
+          role: 'assistant',
+          timestamp: Date.now(),
+          isIntro: true,
+          isAuthenticated: true
+        }]);
+      } else {
+        setMessages([{
+          id: '0',
+          role: 'assistant',
+          content: INTRO_MESSAGE,
+          timestamp: Date.now(),
+          isIntro: true
+        }]);
+      }
+      setCanType(true);
+    };
+
+    // Set initial message and handle visibility changes
+    setInitialMessage();
+    
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        setInitialMessage();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [session]);
 
   const handleTypewriterComplete = () => {

@@ -9,8 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@upstash/ratelimit": "^1.0.0",
-    "@upstash/redis": "^1.28.4",
     "ioredis": "^5.4.1",
     "next": "15.0.1",
     "next-auth": "^4.24.10",

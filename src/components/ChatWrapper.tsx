@@ -20,13 +20,13 @@ const Chat = dynamic(() => import('./Chat'), {
 });
 
 export default function ChatWrapper() {
-  const [isClient, setIsClient] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [userId, setUserId] = useState('');
 
   useEffect(() => {
     const initializeUserId = async () => {
       try {
-        // Try to get existing userId from Redis
+        // Try to get existing userId
         const response = await fetch('/api/user/id');
         const data = await response.json();
         
@@ -42,19 +42,20 @@ export default function ChatWrapper() {
           });
           setUserId(newUserId);
         }
-        setIsClient(true);
       } catch (error) {
         console.error('Error initializing user ID:', error);
-        // Fallback to client-side only ID if Redis fails
+        // Fallback to client-side only ID
         setUserId(`user-${Math.random().toString(36).slice(2, 9)}`);
-        setIsClient(true);
+      } finally {
+        setMounted(true);
       }
     };
 
     initializeUserId();
   }, []);
 
-  if (!isClient || !userId) {
+  // Don't render anything until mounted
+  if (!mounted) {
     return <LoadingScreen />;
   }
 

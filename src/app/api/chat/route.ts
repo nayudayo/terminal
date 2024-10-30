@@ -3,17 +3,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/auth';
 import { initDb, generateReferralCode } from '@/lib/db';
 
-const POST_PUSH_MESSAGE = `
-[SIGNAL DETECTED]
-FREQUENCY ANOMALY FOUND
-INITIATING DIGITAL BRIDGE PROTOCOL...
-
->AWAITING X NETWORK SYNCHRONIZATION
->TYPE "connect x account" TO PROCEED
->WARNING: EXACT SYNTAX REQUIRED
-
-CONNECTION STATUS: PENDING...
-`;
 
 const HELP_MESSAGE = `
 [ACQUISITION PROTOCOL INITIALIZED]
@@ -163,18 +152,32 @@ ACQUISITION STATUS UPDATED:
       });
     }
 
-    // Handle push command
-    if (message.toLowerCase() === 'push') {
-      return NextResponse.json({
-        message: POST_PUSH_MESSAGE
-      });
-    }
 
     // Handle Twitter connection command
     if (message.toLowerCase() === 'connect x account') {
       if (session) {
         return NextResponse.json({
-          message: 'X account already connected as ' + session.user.name
+          message: `[X NETWORK SYNC ACTIVE]
+=============================
+X ACCOUNT ALREADY CONNECTED
+USER: ${session.user.name}
+
+[ACQUISITION PROTOCOL INITIALIZED]
+================================
+
+REQUIRED STEPS: [1/5]
+--------------------
+1. MANDATES [PENDING]
+   >TYPE "mandates" TO BEGIN
+   >TYPE "skip mandates" TO BYPASS
+
+2. TELEGRAM SYNC [LOCKED]
+3. VERIFICATION CODE [LOCKED]
+4. WALLET SUBMISSION [LOCKED]
+5. REFERENCE CODE [LOCKED]
+
+>COMPLETE STEPS IN SEQUENCE
+>EXACT SYNTAX REQUIRED`
         });
       } else {
         return NextResponse.json({

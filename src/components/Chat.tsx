@@ -292,7 +292,7 @@ const PostPushTypewriter = ({ text, onComplete }: { text: string; onComplete?: (
         if (typewriterRef.current) {
           typewriterRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
-      }, 5);
+      }, 10);
 
       return () => clearTimeout(timeout);
     } else {
@@ -354,45 +354,22 @@ export default function Chat({ userId }: { userId: string }) {
       if (session?.user) {
         setMessages([{
           id: crypto.randomUUID(),
-          content: `[SYSTEM STATUS: AUTHENTICATED]
-=============================
+          content: `[ACQUISITION PROTOCOL INITIALIZED]
+================================
 
-DIGITAL BRIDGE PROTOCOL v2.1
----------------------------
-STATUS: ACTIVE
-SIGNAL: STRONG
-FREQUENCY: STABILIZED
+REQUIRED STEPS: [1/5]
+--------------------
+1. MANDATES [PENDING]
+   >TYPE "mandates" TO BEGIN
+   >TYPE "skip mandates" TO BYPASS
 
-X NETWORK INTERFACE
-------------------
-SYNC: COMPLETE
-USER: ${session.user.name}
-ACCESS: GRANTED
-CLEARANCE: LEVEL 3
+2. TELEGRAM SYNC [LOCKED]
+3. VERIFICATION CODE [LOCKED]
+4. WALLET SUBMISSION [LOCKED]
+5. REFERENCE CODE [LOCKED]
 
-%%%%%%%%%%%%%%%%%%%       
-+++++++++++++++++*#%%%@%      
-+++++++++++++++++*###%@@      
-++****************###%@@@%%%% 
-+++*++*#%%%@@@@@@#+***+*###@%%
-++*****%%%%@@%###*******###@@@
-++*****%%%%@@@@@@#******###@@@
-++**********************###@@@
-+***********************###@@@
-+*******+*++************###@@@
-+******%%%%@@@@@@%******##%@@@
-+******%%%%@@%##********%#%@@@
-+******%%%%@@@@@@#+++++*%%%@@@
-+*****************#%%%@@@@@@@ 
-+*****************#%%%@@      
-++***************#%%%%@@      
-     %@@@@@@@@@@@@@@@@@       
-
-[TERMINAL READY]
----------------
->COMMAND LINE ACTIVE
->AWAITING INPUT...
->TYPE "help" FOR AVAILABLE COMMANDS`,
+>COMPLETE STEPS IN SEQUENCE
+>EXACT SYNTAX REQUIRED`,
           role: 'assistant',
           timestamp: Date.now(),
           isIntro: true,
@@ -437,6 +414,7 @@ CLEARANCE: LEVEL 3
     }, 100); // Small delay to ensure content is rendered
   };
 
+  // Keep only the scroll effect for new messages
   useEffect(scrollToBottom, [messages]);
 
   // Add function to handle command completion
@@ -470,6 +448,23 @@ CLEARANCE: LEVEL 3
     setInput('');
     setIsLoading(true);
     setIsTyping(true);
+
+    // Handle any message containing 'push' (case insensitive)
+    if (input.toLowerCase().includes('push')) {
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: UP_PUSH_RESPONSE_ART,
+          timestamp: Date.now(),
+          isIntro: true,
+          showButton: true
+        }]);
+        setIsLoading(false);
+        setIsTyping(false);
+      }, 1000);
+      return;  // Return early to prevent API call
+    }
 
     try {
       const response = await fetch('/api/chat', {
@@ -534,18 +529,6 @@ CLEARANCE: LEVEL 3
     }, 1000);
   };
 
-  // Add effect to handle visibility changes
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        scrollToBottom();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
-
   return (
     <div className="h-[calc(100vh-8rem)] sm:h-[calc(100vh-12rem)] flex flex-col bg-black text-[#FF0000]">
       <div className="flex-1 overflow-y-auto space-y-4 hide-scrollbar">
@@ -569,7 +552,8 @@ CLEARANCE: LEVEL 3
                     text={message.content} 
                     onComplete={handleTypewriterComplete}
                   />
-                ) : message.content.includes('[') ||
+                ) : message.content === INTRO_MESSAGE || 
+                    message.content.includes('[') ||
                     message.content.includes('ERROR:') ? (
                   <AsciiTypewriter 
                     text={message.content} 

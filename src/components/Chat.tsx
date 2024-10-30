@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { signIn, useSession } from 'next-auth/react';
 
 interface Message {
   id: string;
@@ -19,21 +20,35 @@ interface TypewriterProps {
 const Typewriter = ({ text, onComplete }: TypewriterProps) => {
   const [displayText, setDisplayText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
+    if (isComplete) return;
+    
     if (currentIndex < text.length) {
       const timeout = setTimeout(() => {
-        setDisplayText(prev => prev + text[currentIndex]);
+        setDisplayText(text.slice(0, currentIndex + 1));
         setCurrentIndex(prev => prev + 1);
       }, 30);
 
       return () => clearTimeout(timeout);
-    } else if (onComplete) {
-      onComplete();
+    } else {
+      setIsComplete(true);
+      onComplete?.();
     }
-  }, [currentIndex, text, onComplete]);
+  }, [currentIndex, text, onComplete, isComplete]);
 
-  return <span className="break-words">{displayText}</span>;
+  useEffect(() => {
+    if (isComplete) {
+      setDisplayText(text);
+    }
+  }, [isComplete, text]);
+
+  return (
+    <pre className="whitespace-pre font-['Courier_New'] text-sm leading-[1.2] glow-text">
+      {displayText}
+    </pre>
+  );
 };
 
 interface AsciiTypewriterProps {
@@ -45,30 +60,39 @@ interface AsciiTypewriterProps {
 const AsciiTypewriter = ({ text, onComplete  }: AsciiTypewriterProps) => {
   const [displayText, setDisplayText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
   const typewriterRef = useRef<HTMLPreElement>(null);
 
   useEffect(() => {
+    if (isComplete) return;
+
     if (currentIndex < text.length) {
       const timeout = setTimeout(() => {
-        setDisplayText(prev => prev + text[currentIndex]);
+        setDisplayText(text.slice(0, currentIndex + 1));
         setCurrentIndex(prev => prev + 1);
         
-        // Auto-scroll to the current typing position
         if (typewriterRef.current) {
           typewriterRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
       }, 5);
 
       return () => clearTimeout(timeout);
-    } else if (onComplete) {
-      onComplete();
+    } else {
+      setIsComplete(true);
+      onComplete?.();
     }
-  }, [currentIndex, text, onComplete]);
+  }, [currentIndex, text, onComplete, isComplete]);
+
+  useEffect(() => {
+    if (isComplete) {
+      setDisplayText(text);
+    }
+  }, [isComplete, text]);
 
   return (
     <pre 
       ref={typewriterRef}
-      className="whitespace-pre font-['Courier_New'] text-sm leading-[1.2]"
+      className="whitespace-pre font-['Courier_New'] text-sm leading-[1.2] glow-text"
     >
       {displayText}
     </pre>
@@ -133,11 +157,14 @@ const AsciiArtWithButton = ({ onButtonClick }: { text: string; onButtonClick: ()
   const [currentArt, setCurrentArt] = useState(UP_PUSH_RESPONSE_ART);
   const [isPushed, setIsPushed] = useState(false);
   const [isTyping, setIsTyping] = useState(true);
+  const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
-    if (isTyping && currentIndex < currentArt.length) {
+    if (isComplete || !isTyping) return;
+
+    if (currentIndex < currentArt.length) {
       const timeout = setTimeout(() => {
-        setDisplayText(prev => prev + currentArt[currentIndex]);
+        setDisplayText(currentArt.slice(0, currentIndex + 1));
         setCurrentIndex(prev => prev + 1);
         
         if (typewriterRef.current) {
@@ -146,8 +173,16 @@ const AsciiArtWithButton = ({ onButtonClick }: { text: string; onButtonClick: ()
       }, 5);
 
       return () => clearTimeout(timeout);
+    } else {
+      setIsComplete(true);
     }
-  }, [currentIndex, currentArt, isTyping]);
+  }, [currentIndex, currentArt, isTyping, isComplete]);
+
+  useEffect(() => {
+    if (isComplete) {
+      setDisplayText(currentArt);
+    }
+  }, [isComplete, currentArt]);
 
   const handlePush = () => {
     if (isPushed) return;
@@ -158,12 +193,10 @@ const AsciiArtWithButton = ({ onButtonClick }: { text: string; onButtonClick: ()
     setCurrentArt(DOWN_PUSH_RESPONSE_ART);
     window.dispatchEvent(new CustomEvent('push-meter'));
     
-    // Quick push down (300ms)
     setTimeout(() => {
       setCurrentArt(UP_PUSH_RESPONSE_ART);
       setDisplayText(UP_PUSH_RESPONSE_ART);
       
-      // Slower release up (800ms)
       setTimeout(() => {
         setButtonClicked(false);
         setIsPushed(true);
@@ -244,12 +277,15 @@ CONNECTION STATUS: PENDING...
 const PostPushTypewriter = ({ text, onComplete }: { text: string; onComplete?: () => void }) => {
   const [displayText, setDisplayText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
   const typewriterRef = useRef<HTMLPreElement>(null);
 
   useEffect(() => {
+    if (isComplete) return;
+
     if (currentIndex < text.length) {
       const timeout = setTimeout(() => {
-        setDisplayText(prev => prev + text[currentIndex]);
+        setDisplayText(text.slice(0, currentIndex + 1));
         setCurrentIndex(prev => prev + 1);
         
         if (typewriterRef.current) {
@@ -258,15 +294,22 @@ const PostPushTypewriter = ({ text, onComplete }: { text: string; onComplete?: (
       }, 30);
 
       return () => clearTimeout(timeout);
-    } else if (onComplete) {
-      onComplete();
+    } else {
+      setIsComplete(true);
+      onComplete?.();
     }
-  }, [currentIndex, text, onComplete]);
+  }, [currentIndex, text, onComplete, isComplete]);
+
+  useEffect(() => {
+    if (isComplete) {
+      setDisplayText(text);
+    }
+  }, [isComplete, text]);
 
   return (
     <pre 
       ref={typewriterRef}
-      className="whitespace-pre font-['Courier_New'] text-sm leading-[1.2] text-[#FF0000]"
+      className="whitespace-pre font-['Courier_New'] text-sm leading-[1.2] text-[#FF0000] glow-text"
     >
       {displayText}
     </pre>
@@ -280,17 +323,66 @@ export default function Chat({ userId }: { userId: string }) {
   const [isTyping, setIsTyping] = useState(false);
   const [canType, setCanType] = useState(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
+  const { data: session } = useSession();
 
   useEffect(() => {
-    setMessages([{
-      id: '0',
-      role: 'assistant',
-      content: INTRO_MESSAGE,
-      timestamp: Date.now(),
-      isIntro: true
-    }]);
-    setCanType(false);
-  }, []);
+    if (session?.user) {
+      setMessages([{
+        id: crypto.randomUUID(),
+        content: `[SYSTEM STATUS: AUTHENTICATED]
+=============================
+
+DIGITAL BRIDGE PROTOCOL v2.1
+---------------------------
+STATUS: ACTIVE
+SIGNAL: STRONG
+FREQUENCY: STABILIZED
+
+X NETWORK INTERFACE
+------------------
+SYNC: COMPLETE
+USER: ${session.user.name}
+ACCESS: GRANTED
+CLEARANCE: LEVEL 3
+
+%%%%%%%%%%%%%%%%%%%       
++++++++++++++++++*#%%%@%      
++++++++++++++++++*###%@@      
+++****************###%@@@%%%% 
++++*++*#%%%@@@@@@#+***+*###@%%
+++*****%%%%@@%###*******###@@@
+++*****%%%%@@@@@@#******###@@@
+++**********************###@@@
++***********************###@@@
++*******+*++************###@@@
++******%%%%@@@@@@%******##%@@@
++******%%%%@@%##********%#%@@@
++******%%%%@@@@@@#+++++*%%%@@@
++*****************#%%%@@@@@@@ 
++*****************#%%%@@      
+++***************#%%%%@@      
+     %@@@@@@@@@@@@@@@@@       
+
+[TERMINAL READY]
+---------------
+>COMMAND LINE ACTIVE
+>AWAITING INPUT...
+>TYPE "help" FOR AVAILABLE COMMANDS`,
+        role: 'assistant',
+        timestamp: Date.now(),
+        isIntro: true
+      }]);
+    } else {
+      setMessages([{
+        id: '0',
+        role: 'assistant',
+        content: INTRO_MESSAGE,
+        timestamp: Date.now(),
+        isIntro: true
+      }]);
+    }
+    setCanType(true);
+  }, [session]);
 
   const handleTypewriterComplete = () => {
     setCanType(true);
@@ -348,6 +440,20 @@ export default function Chat({ userId }: { userId: string }) {
 
       const data = await response.json();
       
+      if (data.action === 'CONNECT_TWITTER') {
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          content: data.message,
+          role: 'assistant',
+          timestamp: Date.now(),
+        }]);
+        
+        setTimeout(() => {
+          signIn('twitter', { callbackUrl: '/terminal' });
+        }, 2000);
+        return;
+      }
+
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         content: data.message,
@@ -380,14 +486,14 @@ export default function Chat({ userId }: { userId: string }) {
       <div className="flex-1 overflow-y-auto space-y-4 hide-scrollbar">
         {messages.map((message) => (
           <div key={message.id} className="font-mono text-sm sm:text-base break-words">
-            <span className="opacity-50">
+            <span className="opacity-50 glow-text-subtle">
               [{new Date(message.timestamp).toLocaleTimeString()}]
             </span>{' '}
             {message.role === 'user' ? (
-              <span>{`<${userId}> ${message.content}`}</span>
+              <span className="glow-text-bright">{`<${userId}> ${message.content}`}</span>
             ) : (
               <div className="ml-2 sm:ml-4">
-                <span>{`<Messenger> `}</span>
+                <span className="glow-text-bright">{`<Messenger> `}</span>
                 {message.isIntro && message.showButton ? (
                   <AsciiArtWithButton 
                     text={message.content}
@@ -414,7 +520,7 @@ export default function Chat({ userId }: { userId: string }) {
           </div>
         ))}
         {isTyping && (
-          <div className="opacity-50">
+          <div className="opacity-50 glow-text-subtle">
             <Typewriter text="Messenger is typing..." />
           </div>
         )}
@@ -429,13 +535,13 @@ export default function Chat({ userId }: { userId: string }) {
             onChange={(e) => setInput(e.target.value)}
             disabled={!canType || isLoading}
             className="flex-1 bg-transparent focus:outline-none disabled:opacity-50 
-                     disabled:cursor-not-allowed"
+                     disabled:cursor-not-allowed glow-text-input"
             placeholder={canType ? "Enter message..." : "Wait for message to complete..."}
           />
           <button
             type="submit"
             disabled={!canType || isLoading}
-            className="px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed glow-text-bright"
           >
             Send
           </button>

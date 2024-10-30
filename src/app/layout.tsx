@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Press_Start_2P } from 'next/font/google';
 import "./globals.css";
+import { Providers } from './providers';
 
 const pressStart2P = Press_Start_2P({
   weight: '400',
@@ -21,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${pressStart2P.variable} bg-black text-[#FF0000] overflow-x-hidden`}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

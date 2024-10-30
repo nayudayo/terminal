@@ -354,7 +354,22 @@ export default function Chat({ userId }: { userId: string }) {
       if (session?.user) {
         setMessages([{
           id: crypto.randomUUID(),
-          content: `[ACQUISITION PROTOCOL INITIALIZED]
+          content: `[SYSTEM STATUS: AUTHENTICATED]
+=============================
+
+DIGITAL BRIDGE PROTOCOL v2.1
+---------------------------
+STATUS: ACTIVE
+SIGNAL: STRONG
+FREQUENCY: STABILIZED
+
+X NETWORK INTERFACE
+------------------
+SYNC: COMPLETE
+ACCESS: GRANTED
+CLEARANCE: LEVEL 3
+
+[ACQUISITION PROTOCOL INITIALIZED]
 ================================
 
 REQUIRED STEPS: [1/5]

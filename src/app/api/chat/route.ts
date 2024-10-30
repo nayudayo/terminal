@@ -112,6 +112,39 @@ WARNING: EXACT SYNTAX REQUIRED
 AWAITING USER INPUT...
 `;
 
+const AUTHENTICATED_MESSAGE = `[SYSTEM STATUS: AUTHENTICATED]
+=============================
+
+DIGITAL BRIDGE PROTOCOL v2.1
+---------------------------
+STATUS: ACTIVE
+SIGNAL: STRONG
+FREQUENCY: STABILIZED
+
+X NETWORK INTERFACE
+------------------
+SYNC: COMPLETE
+ACCESS: GRANTED
+CLEARANCE: LEVEL 3
+
+[ACQUISITION PROTOCOL INITIALIZED]
+================================
+
+REQUIRED STEPS: [1/5]
+--------------------
+1. MANDATES [PENDING]
+   >TYPE "mandates" TO BEGIN
+   >TYPE "skip mandates" TO BYPASS
+
+2. TELEGRAM SYNC [LOCKED]
+3. VERIFICATION CODE [LOCKED]
+4. WALLET SUBMISSION [LOCKED]
+5. REFERENCE CODE [LOCKED]
+
+>COMPLETE STEPS IN SEQUENCE
+>EXACT SYNTAX REQUIRED
+>TYPE "help" TO SHOW THIS MESSAGE AGAIN`;
+
 export async function POST(request: Request) {
   try {
     const { message } = await request.json();
@@ -157,27 +190,7 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase() === 'connect x account') {
       if (session) {
         return NextResponse.json({
-          message: `[X NETWORK SYNC ACTIVE]
-=============================
-X ACCOUNT ALREADY CONNECTED
-USER: ${session.user.name}
-
-[ACQUISITION PROTOCOL INITIALIZED]
-================================
-
-REQUIRED STEPS: [1/5]
---------------------
-1. MANDATES [PENDING]
-   >TYPE "mandates" TO BEGIN
-   >TYPE "skip mandates" TO BYPASS
-
-2. TELEGRAM SYNC [LOCKED]
-3. VERIFICATION CODE [LOCKED]
-4. WALLET SUBMISSION [LOCKED]
-5. REFERENCE CODE [LOCKED]
-
->COMPLETE STEPS IN SEQUENCE
->EXACT SYNTAX REQUIRED`
+          message: AUTHENTICATED_MESSAGE.replace('ACCESS: GRANTED', `ACCESS: GRANTED\nUSER: ${session.user.name}`)
         });
       } else {
         return NextResponse.json({

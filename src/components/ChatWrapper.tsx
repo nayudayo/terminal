@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 
 const LoadingScreen = () => (
   <div className="h-[calc(100vh-10rem)] flex items-center justify-center bg-black/50 rounded-lg border border-[#FF0000]/20">
-    <div className="text-[#FF0000] font-['Press_Start_2P'] animate-pulse text-[10px]">
+    <div className="text-white font-['Press_Start_2P'] animate-pulse text-[10px]">
       <div className="flex flex-col items-center space-y-2">
         <span className="inline-block w-3 h-3 border-2 border-[#FF0000] border-t-transparent rounded-full animate-spin" />
         <span>INITIALIZING SYSTEM...</span>

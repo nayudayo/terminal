@@ -62,7 +62,7 @@ export default function FrequencyMeter() {
   };
 
   return (
-    <div className="font-mono text-xs sm:text-base break-words glow-text-subtle">
+    <div className="font-mono text-xs sm:text-sm break-words text-white">
       <span>Frequency: </span>
       <span className={getFrequencyColor()}>
         {getMeterBars()} [{frequency.toFixed(1)}/min]

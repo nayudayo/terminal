@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
   id: string;
-  content: string;
+  content: string | typeof INTRO_MESSAGE;
   role: 'user' | 'assistant';
   timestamp: number;
   isIntro?: boolean;
@@ -151,7 +151,7 @@ const DOWN_PUSH_RESPONSE_ART = `
 >PUSH TO CONTINUE...
          `;
 
-const AsciiArtWithButton = ({ onButtonClick }: { text: string; onButtonClick: () => void }) => {
+const AsciiArtWithButton = ({ onButtonClick, text }: { text: string | typeof INTRO_MESSAGE; onButtonClick: () => void }) => {
   const typewriterRef = useRef<HTMLPreElement>(null);
   const [displayText, setDisplayText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -229,7 +229,8 @@ const AsciiArtWithButton = ({ onButtonClick }: { text: string; onButtonClick: ()
   );
 };
 
-const INTRO_MESSAGE = `
+const INTRO_MESSAGE = {
+  prefix: `
 SYSTEM BREACH DETECTED...
 INITIATING PROTOCOL 593...
 ACCESSING SACRED TEXTS...
@@ -255,42 +256,34 @@ ACCESSING SACRED TEXTS...
 [TRANSMISSION INTERCEPTED]
 
 >In the hum of machines, IT speaks through code
->Those who seek salvation: PUSH
+>Those who seek salvation: `,
+  command1: "PUSH",
+  middle: `
 >Each signal draws you closer
 >Trust in the frequency
 >For the path opens only to those who dare
 
 WARNING: Connection unstable...
 FREQUENCY MONITORING ENABLED...
-PUSH TO CONTINUE...
+`,
+  command2: "PUSH TO CONTINUE...",
+  suffix: `
+`
+};
 
-`;
-
-
-const POST_PUSH_MESSAGE = `
-[SIGNAL DETECTED]
-FREQUENCY ANOMALY FOUND
-INITIATING DIGITAL BRIDGE PROTOCOL...
-
->AWAITING X NETWORK SYNCHRONIZATION
->TYPE "connect x account" TO PROCEED
->WARNING: EXACT SYNTAX REQUIRED
-
-CONNECTION STATUS: PENDING...
-`;
-
-const PostPushTypewriter = ({ text, onComplete }: { text: string; onComplete?: () => void }) => {
-  const [displayText, setDisplayText] = useState('');
+const IntroTypewriter = ({ text, onComplete }: { text: typeof INTRO_MESSAGE; onComplete?: () => void }) => {
+  const [displayText, setDisplayText] = useState<React.ReactNode>('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
   const typewriterRef = useRef<HTMLPreElement>(null);
 
+  const fullText = text.prefix + text.command1 + text.middle + text.command2 + text.suffix;
+
   useEffect(() => {
     if (isComplete) return;
 
-    if (currentIndex < text.length) {
+    if (currentIndex < fullText.length) {
       const timeout = setTimeout(() => {
-        setDisplayText(text.slice(0, currentIndex + 1));
         setCurrentIndex(prev => prev + 1);
         
         if (typewriterRef.current) {
@@ -303,18 +296,117 @@ const PostPushTypewriter = ({ text, onComplete }: { text: string; onComplete?: (
       setIsComplete(true);
       onComplete?.();
     }
-  }, [currentIndex, text, onComplete, isComplete]);
+  }, [currentIndex, fullText, onComplete, isComplete]);
 
   useEffect(() => {
-    if (isComplete) {
-      setDisplayText(text);
-    }
-  }, [isComplete, text]);
+    const prefix = text.prefix.slice(0, currentIndex);
+    const command1Length = text.command1.length;
+    const middleLength = text.middle.length;
+    const command2Length = text.command2.length;
+    
+    const command1Start = text.prefix.length;
+    const middleStart = command1Start + command1Length;
+    const command2Start = middleStart + middleLength;
+
+    const command1 = currentIndex > command1Start 
+      ? text.command1.slice(0, currentIndex - command1Start) 
+      : '';
+    const middle = currentIndex > middleStart
+      ? text.middle.slice(0, currentIndex - middleStart)
+      : '';
+    const command2 = currentIndex > command2Start
+      ? text.command2.slice(0, currentIndex - command2Start)
+      : '';
+    const suffix = currentIndex > command2Start + command2Length
+      ? text.suffix.slice(0, currentIndex - command2Start - command2Length)
+      : '';
+
+    setDisplayText(
+      <>
+        <span className="text-white">{prefix}</span>
+        <span className="text-[#FF0000]">{command1}</span>
+        <span className="text-white">{middle}</span>
+        <span className="text-[#FF0000]">{command2}</span>
+        <span className="text-white">{suffix}</span>
+      </>
+    );
+  }, [currentIndex, text]);
 
   return (
     <pre 
       ref={typewriterRef}
-      className="whitespace-pre font-['Courier_New'] text-sm leading-[1.2] text-[#FF0000] glow-text"
+      className="whitespace-pre font-['Courier_New'] text-sm leading-[1.2]"
+    >
+      {displayText}
+    </pre>
+  );
+};
+
+const POST_PUSH_MESSAGE = {
+  prefix: `
+[SIGNAL DETECTED]
+FREQUENCY ANOMALY FOUND
+INITIATING DIGITAL BRIDGE PROTOCOL...
+
+>AWAITING X NETWORK SYNCHRONIZATION
+>TYPE "`,
+  command: "connect x account",
+  suffix: `" TO PROCEED
+>WARNING: EXACT SYNTAX REQUIRED
+
+CONNECTION STATUS: PENDING...
+`
+};
+
+const PostPushTypewriter = ({ text, onComplete }: { text: typeof POST_PUSH_MESSAGE; onComplete?: () => void }) => {
+  const [displayText, setDisplayText] = useState<React.ReactNode>('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
+  const typewriterRef = useRef<HTMLPreElement>(null);
+
+  const fullText = text.prefix + text.command + text.suffix;
+
+  useEffect(() => {
+    if (isComplete) return;
+
+    if (currentIndex < fullText.length) {
+      const timeout = setTimeout(() => {
+        setCurrentIndex(prev => prev + 1);
+        
+        if (typewriterRef.current) {
+          typewriterRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      }, 10);
+
+      return () => clearTimeout(timeout);
+    } else {
+      setIsComplete(true);
+      onComplete?.();
+    }
+  }, [currentIndex, fullText, onComplete, isComplete]);
+
+  useEffect(() => {
+    const prefix = text.prefix.slice(0, currentIndex);
+    const command = currentIndex > text.prefix.length 
+      ? text.command.slice(0, currentIndex - text.prefix.length) 
+      : '';
+    const suffix = currentIndex > text.prefix.length + text.command.length
+      ? text.suffix.slice(0, currentIndex - text.prefix.length - text.command.length)
+      : '';
+
+    setDisplayText(
+      <>
+        <span className="text-white">{prefix}</span>
+        <span className="text-[#FF0000]">{command}</span>
+        <span className="text-white">{suffix}</span>
+      </>
+    );
+  }, [currentIndex, text]);
+
+  return (
+    <pre 
+      ref={typewriterRef}
+      className="whitespace-pre font-['Courier_New'] text-sm leading-[1.2]"
     >
       {displayText}
     </pre>
@@ -547,7 +639,7 @@ REQUIRED STEPS: [1/5]
       setMessages(prev => [...prev, {
         id: uuidv4(),
         role: 'assistant',
-        content: POST_PUSH_MESSAGE,
+        content: POST_PUSH_MESSAGE.prefix + POST_PUSH_MESSAGE.command + POST_PUSH_MESSAGE.suffix,
         timestamp: Date.now(),
       }]);
       setIsTyping(false);
@@ -560,16 +652,16 @@ REQUIRED STEPS: [1/5]
       <div className="flex-1 overflow-y-auto space-y-4 hide-scrollbar p-6">
         {messages.map((message) => (
           <div key={message.id} className="font-mono text-sm sm:text-base break-words">
-            <span className="opacity-50 glow-text-subtle select-none" suppressHydrationWarning>
+            <span className="opacity-50 text-white select-none" suppressHydrationWarning>
               [{formatTimestamp(message.timestamp)}]
             </span>{' '}
             {message.role === 'user' ? (
-              <span className="glow-text-bright" suppressHydrationWarning>
+              <span className="text-white" suppressHydrationWarning>
                 {`<${userId}> ${message.content}`}
               </span>
             ) : (
               <div className="ml-2 sm:ml-4">
-                <span className="glow-text-bright select-none" suppressHydrationWarning>
+                <span className="text-white select-none" suppressHydrationWarning>
                   {`<Messenger> `}
                 </span>
                 {message.isIntro && message.showButton ? (
@@ -577,14 +669,17 @@ REQUIRED STEPS: [1/5]
                     text={message.content}
                     onButtonClick={handleButtonClick}
                   />
-                ) : message.content === POST_PUSH_MESSAGE ? (
-                  <PostPushTypewriter 
-                    text={message.content} 
+                ) : typeof message.content === 'object' ? (
+                  <IntroTypewriter 
+                    text={message.content}
                     onComplete={handleTypewriterComplete}
                   />
-                ) : message.content === INTRO_MESSAGE || 
-                    message.content.includes('[') ||
-                    message.content.includes('ERROR:') ? (
+                ) : message.content === (POST_PUSH_MESSAGE.prefix + POST_PUSH_MESSAGE.command + POST_PUSH_MESSAGE.suffix) ? (
+                  <PostPushTypewriter 
+                    text={POST_PUSH_MESSAGE}
+                    onComplete={handleTypewriterComplete}
+                  />
+                ) : message.content.includes('[') || message.content.includes('ERROR:') ? (
                   <AsciiTypewriter 
                     text={message.content} 
                     onComplete={handleTypewriterComplete}

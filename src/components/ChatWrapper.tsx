@@ -56,9 +56,30 @@ export default function ChatWrapper() {
   }
 
   return (
-    <div className="w-full">
-      <div className="backdrop-blur-sm bg-black/50 rounded-lg border border-[#FF0000]/20 shadow-lg shadow-[#FF0000]/5">
-        {userId && <Chat userId={userId} />}
+    <div className="min-h-[calc(100vh-16rem)] ancient-terminal border border-[#590000] rounded-sm mb-24 flex flex-col">
+      <div className="relative flex-1">
+        {/* Top border with ancient symbols */}
+        <div className="absolute top-0 left-0 w-full h-1 bg-[#590000] opacity-50" />
+        
+        {/* Left border with ancient symbols */}
+        <div className="absolute top-0 left-0 w-1 h-full bg-[#590000] opacity-50" />
+        
+        {/* Right border with ancient symbols */}
+        <div className="absolute top-0 right-0 w-1 h-full bg-[#590000] opacity-50" />
+        
+        {/* Bottom border with ancient symbols */}
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-[#590000] opacity-50" />
+        
+        {/* Corner decorations */}
+        <div className="absolute top-0 left-0 w-2 h-2 bg-[#ff1a1a] opacity-30" />
+        <div className="absolute top-0 right-0 w-2 h-2 bg-[#ff1a1a] opacity-30" />
+        <div className="absolute bottom-0 left-0 w-2 h-2 bg-[#ff1a1a] opacity-30" />
+        <div className="absolute bottom-0 right-0 w-2 h-2 bg-[#ff1a1a] opacity-30" />
+        
+        {/* Main content */}
+        <div className="p-6 flex flex-col min-h-full">
+          {userId && <Chat userId={userId} />}
+        </div>
       </div>
     </div>
   );

@@ -16,30 +16,28 @@ const ChatWrapper = dynamic(() => import('@/components/ChatWrapper'), {
 
 export default function TerminalPage() {
   return (
-    <div className="flex flex-col min-h-screen bg-black" suppressHydrationWarning>
-      <header className="border-b border-[#FF0000]/20 bg-black/90 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto w-full">
-          {/* System stats bar */}
-          <div className="border-b border-[#FF0000]/10 py-1.5 px-4">
+    <div className="flex flex-col min-h-screen bg-black ancient-symbols" suppressHydrationWarning>
+      <header className="border-b border-[#590000] bg-black/95 backdrop-blur-sm sticky top-0 z-50 scanline">
+        <div className="max-w-7xl mx-auto w-full ancient-terminal">
+          <div className="border-b border-[#4a0000] py-2 px-4">
             <div className="flex justify-between items-center">
-              <div className="text-[#FF0000]/50 text-[10px] font-['Press_Start_2P']">
-                SYSTEM VERSION 2.1.0
+              <div className="text-[#4a0000] text-[10px] font-['Press_Start_2P'] glow-text-subtle">
+                SACRED PROTOCOL V7.7.7
               </div>
-              <div className="text-[#FF0000]/50 text-[10px] font-['Press_Start_2P']">
-                SIGNAL STRENGTH: OPTIMAL
+              <div className="text-[#4a0000] text-[10px] font-['Press_Start_2P'] glow-text-subtle">
+                DIVINE CONNECTION: ESTABLISHED
               </div>
             </div>
           </div>
-          {/* Main header content */}
-          <div className="py-2.5 px-4 flex justify-between items-center">
+          <div className="py-3 px-4 flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <h1 className="text-[#FF0000] text-sm font-['Press_Start_2P'] glow-text">
-                TERMINAL
+              <h1 className="text-[#ff1a1a] text-sm font-['Press_Start_2P'] sacred-text">
+                SACRED_TERMINAL
               </h1>
-              <div className="h-4 w-px bg-[#FF0000]/20" />
-              <div className="text-[#FF0000]/70 text-[10px] font-['Press_Start_2P'] flex items-center space-x-2">
-                <span className="inline-block w-2 h-2 bg-[#FF0000] rounded-full animate-pulse" />
-                <span>ACTIVE</span>
+              <div className="h-4 w-px bg-[#590000]" />
+              <div className="text-[#8b0000] text-[10px] font-['Press_Start_2P'] flex items-center space-x-2">
+                <span className="inline-block w-2 h-2 bg-[#ff1a1a] rounded-full animate-pulse" />
+                <span className="glow-text">CHANNELING</span>
               </div>
             </div>
             <FrequencyMeter />
@@ -47,8 +45,7 @@ export default function TerminalPage() {
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 w-full bg-black/30">
+      <main className="flex-1 w-full bg-black/30 ancient-terminal">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <ChatWrapper />
         </div>

@@ -50,9 +50,9 @@ export default function FrequencyMeter() {
   }, [pushes]);
 
   const getFrequencyColor = () => {
-    if (frequency >= 15) return 'text-[#FF0000]';  // High frequency - Red
-    if (frequency >= 8) return 'text-[#FFA500]';   // Medium frequency - Orange
-    return 'text-[#00FF00]';                       // Low frequency - Green
+    if (frequency >= 15) return 'text-[#FF0000] error-text';    // High frequency - Red with shake
+    if (frequency >= 8) return 'text-[#FFA500] warning-text';   // Medium frequency - Orange with pulse
+    return 'text-[#00FF00] success-text';                       // Low frequency - Green with fade
   };
 
   const getMeterBars = () => {
@@ -62,7 +62,7 @@ export default function FrequencyMeter() {
   };
 
   return (
-    <div className="font-mono text-xs sm:text-base break-words">
+    <div className="font-mono text-xs sm:text-base break-words glow-text-subtle">
       <span>Frequency: </span>
       <span className={getFrequencyColor()}>
         {getMeterBars()} [{frequency.toFixed(1)}/min]

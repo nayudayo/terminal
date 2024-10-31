@@ -4,9 +4,17 @@
 
 :root {
   --background: #000000;
-  --foreground: #FF0000;
-  --accent: #8B0000;
+  --foreground: #8b0000;
+  --accent: #590000;
+  --sacred-glow: #ff1a1a;
+  --ancient-text: #4a0000;
   --border: #440000;
+  --glitch-color: rgba(139, 0, 0, 0.15);
+  --shadow-color: rgba(139, 0, 0, 0.15);
+  --warning-color: #8B0000;
+  --error-color: #FF1500;
+  --success-color: #4a0000;
+  --interference-color: rgba(255, 0, 0, 0.02);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,6 +28,20 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: var(--font-press-start);
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/png;base64,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");
+  opacity: 0.015;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Pixel border effect */
@@ -39,8 +61,20 @@ body {
     0 4px 0 #8B0000,
     0 -4px 0 #8B0000,
     4px 0 0 #8B0000,
-    -4px 0 0 #8B0000;
+    -4px 0 0 #8B0000,
+    0 0 15px rgba(255, 0, 0, 0.2);
   transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.retro-button:hover {
+  box-shadow: 
+    0 4px 0 #8B0000,
+    0 -4px 0 #8B0000,
+    4px 0 0 #8B0000,
+    -4px 0 0 #8B0000,
+    0 0 20px rgba(255, 0, 0, 0.4);
 }
 
 .retro-button:active {
@@ -49,7 +83,34 @@ body {
     0 0 0 #8B0000,
     0 -4px 0 #8B0000,
     4px 0 0 #8B0000,
-    -4px 0 0 #8B0000;
+    -4px 0 0 #8B0000,
+    0 0 10px rgba(255, 0, 0, 0.2);
+}
+
+.retro-button::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent,
+    rgba(255, 0, 0, 0.1),
+    transparent
+  );
+  transform: rotate(45deg);
+  animation: buttonGlow 3s linear infinite;
+}
+
+@keyframes buttonGlow {
+  0% {
+    transform: rotate(45deg) translateX(-100%);
+  }
+  100% {
+    transform: rotate(45deg) translateX(100%);
+  }
 }
 
 /* Scanline effect */
@@ -67,12 +128,23 @@ body {
   height: 100%;
   background: repeating-linear-gradient(
     0deg,
-    rgba(255, 0, 0, 0.1),
-    rgba(255, 0, 0, 0.1) 1px,
+    rgba(139, 0, 0, 0.1) 0%,
+    rgba(139, 0, 0, 0.1) 1px,
     transparent 1px,
     transparent 2px
   );
   pointer-events: none;
+  animation: scanline 8s linear infinite;
+  opacity: 0.2;
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
 }
 
 /* Add these to your existing globals.css */
@@ -80,10 +152,12 @@ body {
 .terminal-cursor::after {
   content: "_";
   animation: cursor 1s infinite step-end;
+  opacity: 0.8;
 }
 
 @keyframes cursor {
-  50% { opacity: 0; }
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
 }
 
 /* Terminal scrollbar */
@@ -116,15 +190,17 @@ body {
 
 /* Add these glow effects */
 .glow-text {
-  text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+  text-shadow: 0 0 8px rgba(255, 0, 0, 0.4);
+  animation: textPulse 4s ease-in-out infinite;
 }
 
 .glow-text-bright {
-  text-shadow: 0 0 15px rgba(255, 0, 0, 0.7);
+  text-shadow: 0 0 12px rgba(255, 0, 0, 0.6);
+  animation: textPulse 3s ease-in-out infinite;
 }
 
 .glow-text-subtle {
-  text-shadow: 0 0 5px rgba(255, 0, 0, 0.3);
+  text-shadow: 0 0 4px rgba(255, 0, 0, 0.3);
 }
 
 .glow-text-input {
@@ -146,4 +222,244 @@ body {
 
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Add subtle screen flicker animation */
+@keyframes screenFlicker {
+  0% { opacity: 1; }
+  1% { opacity: 0.95; }
+  2% { opacity: 0.9; }
+  3% { opacity: 1; }
+  20% { opacity: 1; }
+  21% { opacity: 0.93; }
+  22% { opacity: 1; }
+  74% { opacity: 1; }
+  75% { opacity: 0.95; }
+  76% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* Add glitch effect for text */
+@keyframes textGlitch {
+  0% { 
+    text-shadow: 
+      0.05em 0 0 var(--glitch-color),
+      -0.05em -0.025em 0 rgba(0, 255, 0, 0.1),
+      -0.025em 0.025em 0 rgba(0, 0, 255, 0.1);
+  }
+  14% { 
+    text-shadow: 
+      0.05em 0 0 var(--glitch-color),
+      -0.05em -0.025em 0 rgba(0, 255, 0, 0.1),
+      -0.025em 0.025em 0 rgba(0, 0, 255, 0.1);
+  }
+  15% { 
+    text-shadow: 
+      -0.05em -0.025em 0 var(--glitch-color),
+      0.025em 0.025em 0 rgba(0, 255, 0, 0.1),
+      -0.05em -0.05em 0 rgba(0, 0, 255, 0.1);
+  }
+  49% { 
+    text-shadow: 
+      -0.05em -0.025em 0 var(--glitch-color),
+      0.025em 0.025em 0 rgba(0, 255, 0, 0.1),
+      -0.05em -0.05em 0 rgba(0, 0, 255, 0.1);
+  }
+  50% { 
+    text-shadow: 
+      0.025em 0.05em 0 var(--glitch-color),
+      0.05em 0 0 rgba(0, 255, 0, 0.1),
+      0 -0.05em 0 rgba(0, 0, 255, 0.1);
+  }
+  99% { 
+    text-shadow: 
+      0.025em 0.05em 0 var(--glitch-color),
+      0.05em 0 0 rgba(0, 255, 0, 0.1),
+      0 -0.05em 0 rgba(0, 0, 255, 0.1);
+  }
+  100% { 
+    text-shadow: 
+      -0.025em 0 0 var(--glitch-color),
+      -0.025em -0.025em 0 rgba(0, 255, 0, 0.1),
+      -0.025em -0.05em 0 rgba(0, 0, 255, 0.1);
+  }
+}
+
+/* Add vignette effect */
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    circle at center,
+    transparent 0%,
+    rgba(0, 0, 0, 0.4) 70%,
+    rgba(0, 0, 0, 0.8) 100%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes vignetteBreathing {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Warning text effect */
+.warning-text {
+  color: var(--warning-color);
+  animation: warningPulse 2s ease-in-out infinite;
+}
+
+@keyframes warningPulse {
+  0%, 100% {
+    text-shadow: 0 0 10px var(--warning-color);
+  }
+  50% {
+    text-shadow: 0 0 20px var(--warning-color);
+  }
+}
+
+/* Error text effect */
+.error-text {
+  color: var(--error-color);
+  animation: errorShake 0.5s ease-in-out;
+}
+
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-2px); }
+  40% { transform: translateX(2px); }
+  60% { transform: translateX(-1px); }
+  80% { transform: translateX(1px); }
+}
+
+/* Success text effect */
+.success-text {
+  color: var(--success-color);
+  animation: successFade 1s ease-in-out;
+}
+
+@keyframes successFade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes textPulse {
+  0%, 100% {
+    text-shadow: 0 0 8px rgba(255, 0, 0, 0.4);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(255, 0, 0, 0.6);
+  }
+}
+
+/* Add ancient text background effect */
+.ancient-symbols::before {
+  content: "01101000 01100101 01100001 01110110 01100101 01101110";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--ancient-text);
+  opacity: 0.05;
+  pointer-events: none;
+  white-space: pre;
+  overflow: hidden;
+  z-index: 0;
+  animation: scrollSymbols 80s linear infinite;
+}
+
+@keyframes scrollSymbols {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+
+/* Sacred text effect */
+.sacred-text {
+  color: var(--sacred-glow);
+  text-shadow: 0 0 10px var(--sacred-glow);
+  animation: sacredPulse 4s ease-in-out infinite;
+}
+
+@keyframes sacredPulse {
+  0%, 100% {
+    text-shadow: 0 0 10px var(--sacred-glow);
+  }
+  50% {
+    text-shadow: 0 0 20px var(--sacred-glow),
+                 0 0 30px var(--sacred-glow);
+  }
+}
+
+/* Ancient terminal effect */
+.ancient-terminal {
+  background: linear-gradient(
+    rgba(0, 0, 0, 0.97),
+    rgba(0, 0, 0, 0.98)
+  );
+  border: 1px solid var(--accent);
+  box-shadow: inset 0 0 30px rgba(139, 0, 0, 0.3);
+}
+
+/* Ancient decorative elements */
+.ancient-border {
+  border: 1px solid var(--accent);
+  box-shadow: 
+    inset 0 0 30px rgba(139, 0, 0, 0.3),
+    0 0 10px rgba(139, 0, 0, 0.2);
+}
+
+.ancient-text-container {
+  background: linear-gradient(
+    180deg,
+    rgba(89, 0, 0, 0.1) 0%,
+    rgba(89, 0, 0, 0.05) 50%,
+    rgba(89, 0, 0, 0.1) 100%
+  );
+}
+
+/* Enhance ancient terminal effect */
+.ancient-terminal {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.98) 0%,
+    rgba(0, 0, 0, 0.97) 50%,
+    rgba(0, 0, 0, 0.98) 100%
+  );
+  border: 1px solid var(--accent);
+  box-shadow: 
+    inset 0 0 30px rgba(139, 0, 0, 0.3),
+    0 0 15px rgba(139, 0, 0, 0.2);
+}
+
+/* Add ancient scroll effect */
+.ancient-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) var(--background);
+}
+
+.ancient-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ancient-scroll::-webkit-scrollbar-track {
+  background: var(--background);
+  border-left: 1px solid var(--accent);
+}
+
+.ancient-scroll::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 0;
 }

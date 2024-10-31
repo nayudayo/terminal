@@ -23,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body 
-        className={`bg-black min-h-screen ${pressStart2P.className}`}
+        className={`bg-black min-h-screen ${pressStart2P.className} scanline`}
         suppressHydrationWarning
       >
         <Providers>{children}</Providers>

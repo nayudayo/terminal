@@ -151,7 +151,7 @@ const DOWN_PUSH_RESPONSE_ART = `
 >PUSH TO CONTINUE...
          `;
 
-const AsciiArtWithButton = ({ onButtonClick, text }: { text: string | typeof INTRO_MESSAGE; onButtonClick: () => void }) => {
+const AsciiArtWithButton = ({ onButtonClick }: { text: string | typeof INTRO_MESSAGE; onButtonClick: () => void }) => {
   const typewriterRef = useRef<HTMLPreElement>(null);
   const [displayText, setDisplayText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);

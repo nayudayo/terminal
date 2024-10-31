@@ -332,6 +332,12 @@ const IntroTypewriter = ({ text, onComplete }: { text: typeof INTRO_MESSAGE; onC
     );
   }, [currentIndex, text]);
 
+  useEffect(() => {
+    if (isComplete) {
+      onComplete?.();
+    }
+  }, [isComplete, onComplete]);
+
   return (
     <pre 
       ref={typewriterRef}
@@ -403,6 +409,12 @@ const PostPushTypewriter = ({ text, onComplete }: { text: typeof POST_PUSH_MESSA
     );
   }, [currentIndex, text]);
 
+  useEffect(() => {
+    if (isComplete) {
+      onComplete?.();
+    }
+  }, [isComplete, onComplete]);
+
   return (
     <pre 
       ref={typewriterRef}
@@ -445,6 +457,7 @@ export default function Chat({ userId }: { userId: string }) {
     followComplete: false,
     likeComplete: false
   });
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -518,6 +531,7 @@ REQUIRED STEPS: [1/5]
   const handleTypewriterComplete = () => {
     setCanType(true);
     setIsTyping(false);
+    inputRef.current?.focus();
   };
 
   const scrollToBottom = () => {
@@ -705,20 +719,21 @@ REQUIRED STEPS: [1/5]
       <form onSubmit={handleSubmit} className="border-t border-[#FF0000]/20 p-4 bg-black/30">
         <div className="flex items-center gap-2">
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={!canType || isLoading}
             className="flex-1 bg-black/50 focus:outline-none disabled:opacity-50 
                      disabled:cursor-not-allowed glow-text-input px-3 py-2 
-                     border border-[#FF0000]/20 rounded font-['Press_Start_2P'] text-xs"
+                     border border-[#FF0000]/20 rounded font-['Press_Start_2P'] text-xs text-white"
             placeholder={canType ? "Enter message..." : "Wait for message to complete..."}
           />
           <button
             type="submit"
             disabled={!canType || isLoading}
             className="px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed 
-                     glow-text-bright border border-[#FF0000]/20 rounded
+                     text-white border border-[#FF0000]/20 rounded
                      hover:bg-[#FF0000]/10 transition-colors
                      font-['Press_Start_2P'] text-xs"
           >

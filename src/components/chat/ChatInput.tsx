@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 
 interface ChatInputProps {
   input: string;
@@ -10,6 +10,26 @@ interface ChatInputProps {
 
 export function ChatInput({ input, setInput, canType, isLoading, onSubmit }: ChatInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus effect
+  useEffect(() => {
+    // Focus input when component mounts and whenever canType changes to true
+    if (canType && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [canType]);
+
+  // Re-focus when user clicks anywhere in the window
+  useEffect(() => {
+    const handleWindowClick = () => {
+      if (canType && inputRef.current) {
+        inputRef.current.focus();
+      }
+    };
+
+    window.addEventListener('click', handleWindowClick);
+    return () => window.removeEventListener('click', handleWindowClick);
+  }, [canType]);
 
   return (
     <form onSubmit={onSubmit} className="border-t border-[#FF0000]/20 p-4 bg-black/30">

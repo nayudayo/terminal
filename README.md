@@ -1,36 +1,126 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sacred Terminal
 
-## Getting Started
+A mysterious terminal-style web application built with Next.js, featuring real-time chat interactions, authentication, and cryptic messaging systems.
 
-First, run the development server:
+## 🌟 Features
+
+- Interactive terminal interface with typewriter effects
+- Real-time binary rain animation
+- Authentication system with Twitter integration
+- SQLite database integration
+- Redis caching
+- Telegram bot integration
+- Wallet integration (Solana & NEAR)
+- Custom styling with TailwindCSS
+- Responsive design with retro aesthetics
+
+## 🚀 Tech Stack
+
+- **Framework**: Next.js 15.0.1
+- **Language**: TypeScript
+- **Styling**: TailwindCSS
+- **Database**: SQLite (better-sqlite3)
+- **Caching**: Redis
+- **Authentication**: NextAuth.js
+- **APIs Integration**:
+  - Twitter API
+  - OpenAI API
+  - Solana Web3
+  - NEAR API
+- **Other Tools**:
+  - UUID for unique identifiers
+  - Press Start 2P font for retro styling
+
+## 📦 Installation
+
+1. Clone the repository:
+git clone <repository-url>
+cd terminal
+
+2. Install dependencies:
+
+```bash
+npm install
+or
+yarn install
+or
+pnpm install
+or
+bun install
+```
+
+3. Set up environment variables:
+Create a `.env.local` file in the root directory and add the necessary environment variables (see `.env.example` for required variables).
+
+4. Run the development server:
 
 ```bash
 npm run dev
-# or
+or
 yarn dev
-# or
+or
 pnpm dev
-# or
+or
 bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📁 Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+src/
+├── app/ # Next.js app directory
+│ ├── api/ # API routes
+│ ├── auth/ # Authentication pages
+│ └── terminal/ # Terminal interface
+├── components/ # React components
+├── constants/ # Constants and messages
+├── hooks/ # Custom React hooks
+├── lib/ # Utility functions and database
+├── types/ # TypeScript type definitions
+└── utils/ # Helper functions
 
-## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+## 🔧 Configuration
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The project uses several configuration files:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `next.config.js` - Next.js configuration
+- `tailwind.config.ts` - TailwindCSS configuration
+- `tsconfig.json` - TypeScript configuration
+- `postcss.config.mjs` - PostCSS configuration
+- `.eslintrc.json` - ESLint configuration
 
-## Deploy on Vercel
+## 🔐 Authentication
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The application uses NextAuth.js for authentication with Twitter integration. Make sure to set up the required environment variables for authentication to work properly.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 💾 Database
+
+The project uses SQLite for data persistence with the following main tables:
+- user_sessions
+- referral_codes
+- message_tracking
+- schema_migrations
+
+Database migrations can be found in `src/lib/migrations/`.
+
+## 🎨 Styling
+
+The application uses a custom theme with retro-style effects including:
+- Scanline effects
+- Glowing text
+- Binary rain animation
+- Pixel borders
+- Custom scrollbars
+- Ancient terminal aesthetics
+
+## 🙏 Acknowledgments
+
+- Next.js team for the amazing framework
+- Vercel for hosting and deployment platform
+- All contributors and maintainers
+
+## 📞 Contact
+
+[nayugrowgami@gmail.com](mailto:nayugrowgami@gmail.com)

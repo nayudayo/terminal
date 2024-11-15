@@ -43,7 +43,7 @@ export function ChatInput({ input, setInput, canType, isLoading, onSubmit }: Cha
           className="flex-1 bg-black/50 focus:outline-none disabled:opacity-50 
                    disabled:cursor-not-allowed glow-text-input px-3 py-2 
                    border border-[#FF0000]/20 rounded font-['Press_Start_2P'] text-xs text-white"
-          placeholder={canType ? "Enter message..." : "Wait for message to complete..."}
+          placeholder={canType ? "Enter query..." : "Messenger typing..."}
         />
         <button
           type="submit"

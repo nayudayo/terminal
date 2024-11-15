@@ -11,10 +11,9 @@ export async function GET(request: Request) {
     }
 
     const db = await initDb();
-    const status = await db.get(
-      'SELECT * FROM message_tracking WHERE user_id = ?',
-      [session.user.id]
-    );
+    const status = await db.prepare(
+      'SELECT * FROM message_tracking WHERE user_id = ?'
+    ).all();
 
     return NextResponse.json({ status: status || {} });
   } catch (error) {

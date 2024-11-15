@@ -80,7 +80,7 @@ export default function LandingPage() {
           className="retro-button bg-[#590000] text-[#ff1a1a] px-12 py-6 text-sm tracking-wider font-['Press_Start_2P'] hover:bg-[#4a0000] transition-colors"
         >
           INITIATE SACRED SEQUENCE
-        </button>
+        </button>1
       </div>
     </div>
   );

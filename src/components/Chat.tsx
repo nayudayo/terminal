@@ -10,7 +10,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { POST_PUSH_MESSAGE } from '@/constants/messages';
 import { PushButton } from './chat/PushButton';
 import AuthModal from './AuthModal';
-import BinaryRain from './BinaryRain';
 
 // Create a MessageContent component to handle different message types
 const MessageContent = ({ 
@@ -194,12 +193,11 @@ export default function Chat({ userId }: { userId: string }) {
   }, [userId, setMessages]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-16rem)] bg-black/80 rounded-lg relative overflow-hidden">
-      <BinaryRain />
-      {/* Messages container - scrollable area */}
+    <div className="flex flex-col h-[calc(100vh-16rem)] rounded-lg relative">
+      {/* Messages container with solid background */}
       <div 
         ref={messageContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto hide-scrollbar bg-black/30"
+        className="flex-1 min-h-0 overflow-y-auto hide-scrollbar bg-black/95"
       >
         <div className="p-4 font-mono whitespace-pre-wrap">
           {messages.map((message) => (

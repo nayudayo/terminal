@@ -19,7 +19,7 @@ export default function TerminalPage() {
   return (
     <div className="flex flex-col min-h-screen bg-black relative">
       <BinaryRain />
-      <div className="relative z-10">
+      <div className="relative z-10 flex flex-col h-screen">
         <header className="border-b border-[#590000] bg-black/95 backdrop-blur-sm sticky top-0 z-50 scanline">
           <div className="max-w-7xl mx-auto w-full ancient-terminal">
             <div className="border-b border-[#4a0000] py-2 px-4">
@@ -48,9 +48,11 @@ export default function TerminalPage() {
           </div>
         </header>
 
-        <main className="flex-1 w-full bg-black/30 ancient-terminal">
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <ChatWrapper />
+        <main className="flex-1 w-full overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 py-12 h-full">
+            <div className="bg-black border border-[#590000]/20 rounded-lg shadow-lg ancient-terminal h-full">
+              <ChatWrapper />
+            </div>
           </div>
         </main>
       </div>

@@ -156,10 +156,102 @@ REQUIRED STEPS: [1/5]
 >EXACT SYNTAX REQUIRED
 >TYPE "help" TO SHOW THIS MESSAGE AGAIN`;
 
+// Add this function at the top to get stage-specific messages
+function getStageMessage(stage: SessionStage): string {
+  switch (stage) {
+    case SessionStage.MANDATES:
+      return MANDATES_MESSAGE;
+    case SessionStage.TELEGRAM_REDIRECT:
+      return TELEGRAM_MESSAGE;
+    case SessionStage.TELEGRAM_CODE:
+      return VERIFICATION_MESSAGE;
+    case SessionStage.WALLET_SUBMIT:
+      return WALLET_MESSAGE;
+    case SessionStage.REFERENCE_CODE:
+      return REFERENCE_MESSAGE;
+    case SessionStage.PROTOCOL_COMPLETE:
+      return `[PROTOCOL COMPLETE]
+=============================
+ALL STEPS VERIFIED
+SYSTEM ACCESS GRANTED
+
+>INITIALIZATION COMPLETE
+>AWAITING FURTHER INSTRUCTIONS...`;
+    default:
+      return AUTHENTICATED_MESSAGE;
+  }
+}
+
+// Add interface for SQLite user session
+interface DBUserSession {
+  user_id: string;
+  stage: number;
+  twitter_id: string | null;
+  original_user_id: string | null;
+  access_token: string | null;
+  last_active: number | null;
+  created_at: string;
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     const { message, userId } = await request.json();
+
+    // If message is 'LOAD_CURRENT_STAGE', return the appropriate message for their stage
+    if (message === 'LOAD_CURRENT_STAGE') {
+      if (!session?.user?.id) {
+        return NextResponse.json({
+          message: AUTHENTICATED_MESSAGE
+        });
+      }
+
+      try {
+        // First try to get session from Redis
+        const redisSession = await SessionManager.getSession(session.user.id);
+        
+        if (redisSession) {
+          console.log(`[Loading Stage from Redis] Twitter ID: ${session.user.id}, Stage: ${redisSession.stage}`);
+          return NextResponse.json({
+            message: getStageMessage(redisSession.stage)
+          });
+        }
+
+        // If no Redis session, check SQLite
+        const db = await initDb();
+        const userMapping = await db.prepare(
+          'SELECT * FROM user_sessions WHERE twitter_id = ?'
+        ).get(session.user.id) as DBUserSession | undefined;
+
+        if (!userMapping) {
+          return NextResponse.json({
+            message: AUTHENTICATED_MESSAGE
+          });
+        }
+
+        // If found in SQLite but not in Redis, recreate Redis session
+        const newSession = await SessionManager.createSession(
+          session.user.id, 
+          userMapping.stage as SessionStage // Cast to SessionStage since we know it's valid
+        );
+
+        if (newSession) {
+          console.log(`[Loading Stage from SQLite] Twitter ID: ${session.user.id}, Stage: ${newSession.stage}`);
+          return NextResponse.json({
+            message: getStageMessage(newSession.stage)
+          });
+        }
+
+        return NextResponse.json({
+          message: AUTHENTICATED_MESSAGE
+        });
+      } catch (error) {
+        console.error('Error loading stage:', error);
+        return NextResponse.json({
+          message: AUTHENTICATED_MESSAGE
+        });
+      }
+    }
 
     // Handle push button sequence
     if (message.toLowerCase() === 'up_push_button') {
@@ -217,7 +309,18 @@ export async function POST(request: Request) {
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.MANDATES);
+
+      // Get current session to check stage
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      // Only allow skip if in correct stage
+      if (!currentSession || currentSession.stage > SessionStage.MANDATES) {
+        return NextResponse.json({
+          message: 'ERROR: MANDATE PHASE ALREADY COMPLETED'
+        });
+      }
+
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
       return NextResponse.json({
         message: `[MANDATE PROTOCOL BYPASSED]
 =============================
@@ -235,7 +338,8 @@ ACQUISITION STATUS UPDATED:
 5. REFERENCE CODE [LOCKED]
 
 >PROCEED TO NEXT STEP`,
-        commandComplete: true
+        commandComplete: true,
+        shouldAutoScroll: true
       });
     }
 
@@ -246,6 +350,19 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+
+      // Get current session to check stage
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      // If they've already completed or bypassed mandates, don't allow going back
+      if (currentSession && currentSession.stage > SessionStage.MANDATES) {
+        return NextResponse.json({
+          message: `ERROR: MANDATE PHASE ALREADY COMPLETED
+=============================
+CURRENT PHASE: ${getStageMessage(currentSession.stage)}`
+        });
+      }
+
       await SessionManager.updateSessionStage(session.user.id, SessionStage.MANDATES);
       return NextResponse.json({
         message: MANDATES_MESSAGE
@@ -364,6 +481,17 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+
+      // Get current session to check stage
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      // Only allow telegram command if they're at the right stage
+      if (!currentSession || currentSession.stage < SessionStage.TELEGRAM_REDIRECT) {
+        return NextResponse.json({
+          message: 'ERROR: MUST COMPLETE PREVIOUS STEPS FIRST'
+        });
+      }
+
       await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
       return NextResponse.json({
         message: TELEGRAM_MESSAGE
@@ -410,6 +538,21 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (!currentSession || currentSession.stage < SessionStage.TELEGRAM_CODE) {
+        return NextResponse.json({
+          message: 'ERROR: MUST COMPLETE PREVIOUS STEPS FIRST'
+        });
+      }
+
+      if (currentSession.stage > SessionStage.TELEGRAM_CODE) {
+        return NextResponse.json({
+          message: 'ERROR: VERIFICATION PHASE ALREADY COMPLETED'
+        });
+      }
+
       await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
       return NextResponse.json({
         message: VERIFICATION_MESSAGE
@@ -453,6 +596,21 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (!currentSession || currentSession.stage < SessionStage.WALLET_SUBMIT) {
+        return NextResponse.json({
+          message: 'ERROR: MUST COMPLETE PREVIOUS STEPS FIRST'
+        });
+      }
+
+      if (currentSession.stage > SessionStage.WALLET_SUBMIT) {
+        return NextResponse.json({
+          message: 'ERROR: WALLET PHASE ALREADY COMPLETED'
+        });
+      }
+
       await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
       return NextResponse.json({
         message: WALLET_MESSAGE
@@ -496,6 +654,21 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
+        return NextResponse.json({
+          message: 'ERROR: MUST COMPLETE PREVIOUS STEPS FIRST'
+        });
+      }
+
+      if (currentSession.stage > SessionStage.REFERENCE_CODE) {
+        return NextResponse.json({
+          message: 'ERROR: REFERENCE PHASE ALREADY COMPLETED'
+        });
+      }
+
       return NextResponse.json({
         message: REFERENCE_MESSAGE
       });

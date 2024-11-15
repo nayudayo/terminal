@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import BinaryRain from '@/components/BinaryRain';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -65,17 +66,18 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="h-screen w-screen bg-black flex items-center justify-center ancient-symbols">
-      <div className="text-center space-y-12 ancient-terminal p-16 relative">
-        <h1 className="text-[#8b0000] text-3xl tracking-wider sacred-text terminal-cursor">
+    <div className="min-h-screen w-full bg-black flex flex-col items-center justify-center relative overflow-hidden">
+      <BinaryRain />
+      <div className="relative z-10 text-center space-y-12 p-16 bg-black/30 backdrop-blur-sm rounded-lg border border-[#590000]/20 ancient-terminal">
+        <h1 className="text-[#ff1a1a] text-3xl tracking-wider font-['Press_Start_2P'] terminal-cursor glow-text">
           {text}
         </h1>
-        <p className="text-[#4a0000] text-sm tracking-wide glow-text-subtle">
+        <p className="text-[#8b0000] text-sm tracking-wide font-['Press_Start_2P'] glow-text-subtle">
           {verse}
         </p>
         <button
           onClick={handleInitiateSequence}
-          className="retro-button bg-[#590000] text-[#ff1a1a] px-12 py-6 text-sm tracking-wider sacred-text"
+          className="retro-button bg-[#590000] text-[#ff1a1a] px-12 py-6 text-sm tracking-wider font-['Press_Start_2P'] hover:bg-[#4a0000] transition-colors"
         >
           INITIATE SACRED SEQUENCE
         </button>

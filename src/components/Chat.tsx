@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { POST_PUSH_MESSAGE } from '@/constants/messages';
 import { PushButton } from './chat/PushButton';
 import AuthModal from './AuthModal';
+import BinaryRain from './BinaryRain';
 
 // Create a MessageContent component to handle different message types
 const MessageContent = ({ 
@@ -161,8 +162,40 @@ export default function Chat({ userId }: { userId: string }) {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    const loadCurrentStage = async () => {
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: 'LOAD_CURRENT_STAGE',
+            userId
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setMessages(prev => [...prev, {
+            id: uuidv4(),
+            content: data.message,
+            role: 'assistant',
+            timestamp: Date.now()
+          }]);
+        }
+      } catch (error) {
+        console.error('Error loading current stage:', error);
+      }
+    };
+
+    loadCurrentStage();
+  }, [userId, setMessages]);
+
   return (
-    <div className="flex flex-col h-[calc(100vh-16rem)] bg-transparent rounded-lg relative">
+    <div className="flex flex-col h-[calc(100vh-16rem)] bg-black/80 rounded-lg relative overflow-hidden">
+      <BinaryRain />
       {/* Messages container - scrollable area */}
       <div 
         ref={messageContainerRef}

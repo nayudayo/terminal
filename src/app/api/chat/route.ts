@@ -5,6 +5,7 @@ import { generateReferralCode, initDb } from '@/lib/db';
 import { UP_PUSH_RESPONSE_ART } from '@/constants/messages';
 import { SessionManager } from '@/lib/sessionManager';
 import { SessionStage } from '@/types/session';
+import { generateResponse } from '@/lib/gptHandler';
 
 interface ReferralCode {
   code: string;
@@ -830,13 +831,29 @@ YOUR REFERENCE CODE: ${existingCode.code}
       }
     }
 
-    // Handle other messages
-    const response = {
-      message: `Echo: ${message}`,
-    };
+    // If no command matches, treat as conversation with GPT
+    if (session) {
+      const currentSession = await SessionManager.getSession(session.user.id);
+      if (!currentSession) {
+        return NextResponse.json({
+          message: 'ERROR: SESSION NOT FOUND'
+        });
+      }
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return NextResponse.json(response);
+      const aiResponse = await generateResponse(
+        message,
+        currentSession.stage
+      );
+
+      return NextResponse.json({
+        message: aiResponse,
+        shouldAutoScroll: true
+      });
+    }
+
+    return NextResponse.json({
+      message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
+    });
 
   } catch (error) {
     console.error('Error in chat route:', error);

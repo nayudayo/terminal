@@ -38,4 +38,10 @@ export interface ChatResponse {
   commandComplete?: boolean;
   shouldAutoScroll?: boolean;
   dispatchEvent?: string;
-} 
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}

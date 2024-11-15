@@ -39,7 +39,7 @@ cd terminal
 
 2. Install dependencies:
 
-```bash
+```
 npm install
 or
 yarn install
@@ -54,7 +54,7 @@ Create a `.env.local` file in the root directory and add the necessary environme
 
 4. Run the development server:
 
-```bash
+```
 npm run dev
 or
 yarn dev
@@ -67,7 +67,7 @@ bun dev
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ## 📁 Project Structure
-
+```
 src/
 ├── app/ # Next.js app directory
 │ ├── api/ # API routes
@@ -79,7 +79,7 @@ src/
 ├── lib/ # Utility functions and database
 ├── types/ # TypeScript type definitions
 └── utils/ # Helper functions
-
+```
 
 ## 🔧 Configuration
 

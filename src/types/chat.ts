@@ -1,4 +1,5 @@
 import { INTRO_MESSAGE, POST_PUSH_MESSAGE } from '@/constants/messages';
+import { SessionStage } from '@/types/session';
 
 export interface Message {
   id: string;
@@ -13,17 +14,20 @@ export interface Message {
 export interface ChatState {
   messages: Message[];
   completionStatus: CompletionStatus;
+  sessionStage?: SessionStage;
   timestamp: number;
 }
 
 export interface CompletionStatus {
-  mandatesComplete: boolean;
-  followComplete: boolean;
-  likeComplete: boolean;
-  telegramComplete: boolean;
-  verificationComplete: boolean;
-  walletComplete: boolean;
-  referenceComplete: boolean;
+  pushComplete?: boolean;
+  pushDownComplete?: boolean;
+  followComplete?: boolean;
+  likeComplete?: boolean;
+  mandatesComplete?: boolean;
+  telegramComplete?: boolean;
+  verificationComplete?: boolean;
+  walletComplete?: boolean;
+  referenceComplete?: boolean;
   currentStep: number;
   lastUpdated: number;
 }
@@ -33,4 +37,5 @@ export interface ChatResponse {
   action?: 'CONNECT_TWITTER';
   commandComplete?: boolean;
   shouldAutoScroll?: boolean;
+  dispatchEvent?: string;
 } 

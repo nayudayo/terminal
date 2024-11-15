@@ -9,6 +9,7 @@ import { Typewriter } from './chat/Typewriter';
 import { v4 as uuidv4 } from 'uuid';
 import { POST_PUSH_MESSAGE } from '@/constants/messages';
 import { PushButton } from './chat/PushButton';
+import AuthModal from './AuthModal';
 
 // Create a MessageContent component to handle different message types
 const MessageContent = ({ 
@@ -121,6 +122,9 @@ interface ChatHookReturn {
   setShowTelegramFallback: React.Dispatch<React.SetStateAction<boolean>>;
   handleSubmit: (e: React.FormEvent) => Promise<void>;
   handleTypewriterComplete: () => void;
+  showAuthModal: boolean;
+  setShowAuthModal: React.Dispatch<React.SetStateAction<boolean>>;
+  handleAuthConnect: () => void;
 }
 
 export default function Chat({ userId }: { userId: string }) {
@@ -135,7 +139,10 @@ export default function Chat({ userId }: { userId: string }) {
     setMessages,
     setShowTelegramFallback,
     handleSubmit,
-    handleTypewriterComplete
+    handleTypewriterComplete,
+    showAuthModal,
+    setShowAuthModal,
+    handleAuthConnect,
   } = useChat(userId) as ChatHookReturn;
 
   const messageContainerRef = useRef<HTMLDivElement>(null);
@@ -230,6 +237,17 @@ export default function Chat({ userId }: { userId: string }) {
           </div>
         </div>
       )}
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onConnect={handleAuthConnect}
+        onAuthStart={() => {
+          setShowAuthModal(false);
+          // Add any additional auth start logic here
+        }}
+      />
     </div>
   );
 }

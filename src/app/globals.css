@@ -463,3 +463,89 @@ body::after {
   background: var(--accent);
   border-radius: 0;
 }
+
+/* Add or update these styles */
+
+/* Base terminal text styles */
+.terminal-text {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.15em;  /* Increased from 0.1em */
+  line-height: 2;        /* Increased from 1.6 */
+  font-size: 1.15rem;    /* Increased from 1.1rem */
+}
+
+/* Ancient terminal specific styles */
+.ancient-terminal {
+  font-family: 'Press_Start_2P', monospace;
+  letter-spacing: 0.18em;  /* Increased from 0.15em */
+  line-height: 2.2;       /* Increased from 1.8 */
+}
+
+/* Chat message styles */
+.chat-message {
+  letter-spacing: 0.15em;  /* Increased from 0.12em */
+  line-height: 2;         /* Increased from 1.7 */
+  font-size: 1.1rem;      /* Increased from 1.05rem */
+  white-space: pre-wrap;
+}
+
+/* Command input styles */
+.command-input {
+  letter-spacing: 0.15em;  /* Increased from 0.12em */
+  font-size: 1.15rem;     /* Increased from 1.1rem */
+  line-height: 2;         /* Increased from 1.6 */
+}
+
+/* Status text styles */
+.status-text {
+  letter-spacing: 0.18em;  /* Increased from 0.15em */
+  font-size: 1.2rem;      /* Increased from 1.15rem */
+  line-height: 2.2;       /* Increased from 1.8 */
+}
+
+/* ASCII art preservation */
+.ascii-art {
+  font-family: monospace;
+  white-space: pre;
+  letter-spacing: 0;  /* No extra spacing for ASCII art */
+  line-height: 1.2;   /* Tighter line height for ASCII art */
+}
+
+/* Glow effect with wider spacing */
+.glow-text {
+  text-shadow: 0 0 5px currentColor;
+  letter-spacing: 0.15em;
+}
+
+/* Update existing styles */
+.sacred-text {
+  letter-spacing: 0.18em;  /* Increased from 0.15em */
+  font-size: 1.2rem;      /* Increased from 1.15rem */
+  line-height: 2.2;       /* Increased from 1.8 */
+}
+
+/* Add these to your existing styles */
+.message-text {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.15em;  /* Increased from 0.12em */
+  line-height: 2;         /* Increased from 1.7 */
+  font-size: 1.1rem;      /* Increased from 1.05rem */
+  white-space: pre-wrap;
+}
+
+.header-text {
+  font-family: 'Press_Start_2P', monospace;
+  letter-spacing: 0.18em;  /* Increased from 0.15em */
+  line-height: 2.2;       /* Increased from 1.8 */
+  font-size: 1.25rem;     /* Increased from 1.2rem */
+}
+
+/* Add more spacing between messages */
+.chat-message + .chat-message {
+  margin-top: 1.5rem;     /* Add space between consecutive messages */
+}
+
+/* Add spacing for timestamps */
+.timestamp {
+  margin-bottom: 0.5rem;  /* Add space below timestamps */
+}

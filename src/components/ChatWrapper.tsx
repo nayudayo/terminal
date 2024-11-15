@@ -34,17 +34,14 @@ export default function ChatWrapper() {
         if (data.userId) {
           setUserId(data.userId);
         } else {
-          const newUserId = `user-${Math.random().toString(36).slice(2, 9)}`;
-          await fetch('/api/user/id', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: newUserId }),
+          const response = await fetch('/api/session/create', {
+            method: 'POST'
           });
-          setUserId(newUserId);
+          const data = await response.json();
+          setUserId(data.userId);
         }
       } catch (error) {
         console.error('Error initializing user ID:', error);
-        setUserId(`user-${Math.random().toString(36).slice(2, 9)}`);
       }
     };
 

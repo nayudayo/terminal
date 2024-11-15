@@ -6,24 +6,25 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "npm rebuild better-sqlite3"
   },
   "dependencies": {
     "@solana/web3.js": "^1.95.4",
     "@types/uuid": "^10.0.0",
+    "better-sqlite3": "^9.6.0",
     "ioredis": "^5.4.1",
     "near-api-js": "^5.0.1",
     "next": "15.0.1",
     "next-auth": "^4.24.10",
-    "node": "^22.11.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7",
-    "twitter-api-v2": "^1.18.1",
+    "redis": "^4.7.0",
+    "twitter-api-v2": "^1.18.2",
     "uuid": "^11.0.2"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

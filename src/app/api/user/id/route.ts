@@ -66,47 +66,60 @@ const setUserIdInCookie = async (sessionId: string, userId: string) => {
 };
 
 export async function GET() {
+  try {
+    const sessionId = await getSessionId();
+    let userId = null;
+    
+    // Try Redis first
     try {
-      const sessionId = await getSessionId(); // Add await here
-      let userId = null;
-      
-      try {
-        const client = getRedisClient();
-        if (client.status === 'ready') {
-          userId = await client.get(`user_id:${sessionId}`);
-        }
-      } catch (redisError) {
-        console.warn('Redis error, falling back to cookies:', redisError);
-        userId = await getUserIdFromCookie(sessionId);
+      const client = getRedisClient();
+      if (client.status === 'ready') {
+        userId = await client.get(`user_id:${sessionId}`);
       }
-      
-      return NextResponse.json({ userId });
-    } catch (error) {
-      console.error('Error getting user ID:', error);
-      return NextResponse.json({ error: 'Failed to get user ID' }, { status: 500 });
+    } catch (redisError) {
+      console.warn('Redis error, falling back to cookies:', redisError);
     }
+    
+    // Fallback to cookies if Redis fails
+    if (!userId) {
+      userId = await getUserIdFromCookie(sessionId);
+    }
+    
+    return NextResponse.json({ userId });
+  } catch (error) {
+    console.error('Error getting user ID:', error);
+    return NextResponse.json({ error: 'Failed to get user ID' }, { status: 500 });
   }
-  
-  export async function POST(request: Request) {
+}
+
+export async function POST(request: Request) {
+  try {
+    const { userId } = await request.json();
+    const sessionId = await getSessionId();
+    
+    // Store in both Redis and cookies for redundancy
+    const response = NextResponse.json({ success: true, userId });
+    
+    // Set in cookies with longer expiration
+    response.cookies.set('originalUserId', userId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 24 * 7 // 1 week
+    });
+    
     try {
-      const { userId } = await request.json();
-      const sessionId = await getSessionId(); // Add await here
-      
-      try {
-        const client = getRedisClient();
-        if (client.status === 'ready') {
-          await client.set(`user_id:${sessionId}`, userId, 'EX', 60 * 60 * 24 * 7);
-        }
-      } catch (redisError) {
-        console.warn('Redis error, falling back to cookies:', redisError);
+      const client = getRedisClient();
+      if (client.status === 'ready') {
+        await client.set(`user_id:${sessionId}`, userId, 'EX', 60 * 60 * 24 * 7);
       }
-      
-      // Always set in cookies as fallback
-      await setUserIdInCookie(sessionId, userId);
-      
-      return NextResponse.json({ success: true, userId });
-    } catch (error) {
-      console.error('Error storing user ID:', error);
-      return NextResponse.json({ error: 'Failed to store user ID' }, { status: 500 });
+    } catch (redisError) {
+      console.warn('Redis error, falling back to cookies:', redisError);
     }
+    
+    return response;
+  } catch (error) {
+    console.error('Error storing user ID:', error);
+    return NextResponse.json({ error: 'Failed to store user ID' }, { status: 500 });
   }
+}

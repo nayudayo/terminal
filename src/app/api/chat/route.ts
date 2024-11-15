@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/auth';
-import { initDb, generateReferralCode } from '@/lib/db';
+import { generateReferralCode, initDb } from '@/lib/db';
+import { UP_PUSH_RESPONSE_ART } from '@/constants/messages';
+import { SessionManager } from '@/lib/sessionManager';
+import { SessionStage } from '@/types/session';
 
+interface ReferralCode {
+  code: string;
+  twitter_id: string;
+  twitter_name: string;
+  used_count: number;
+  created_at: string;
+}
 
 const HELP_MESSAGE = `
 [ACQUISITION PROTOCOL INITIALIZED]
@@ -147,8 +157,50 @@ REQUIRED STEPS: [1/5]
 
 export async function POST(request: Request) {
   try {
-    const { message } = await request.json();
     const session = await getServerSession(authOptions);
+    const { message, userId } = await request.json();
+
+    // Handle push button sequence
+    if (message.toLowerCase() === 'up_push_button') {
+      return NextResponse.json({
+        message: '[BUTTON ENGAGED]\nINITIATING SEQUENCE...',
+        shouldAutoScroll: true
+      });
+    }
+
+    if (message.toLowerCase() === 'down_push_button') {
+      // Add a delay before showing the connect message
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+
+      return NextResponse.json({
+        message: '[SIGNAL DETECTED]\nFREQUENCY ANOMALY FOUND\nINITIATING DIGITAL BRIDGE PROTOCOL...\n\n>AWAITING X NETWORK SYNCHRONIZATION\n>TYPE "connect x account" TO PROCEED\n>WARNING: EXACT SYNTAX REQUIRED\n\nCONNECTION STATUS: PENDING...',
+        shouldAutoScroll: true
+      });
+    }
+
+    // Handle Twitter connection command
+    if (message.toLowerCase() === 'connect x account') {
+      if (session) {
+        await SessionManager.updateSessionStage(session.user.id, SessionStage.AUTHENTICATED);
+        
+        // Mark connect_x_message as shown
+        const db = await initDb();
+        await db.prepare(
+          `UPDATE message_tracking 
+           SET connect_x_message_shown = TRUE 
+           WHERE user_id = ?`
+        ).run(session.user.id);
+
+        return NextResponse.json({
+          message: AUTHENTICATED_MESSAGE.replace('ACCESS: GRANTED', `ACCESS: GRANTED\nUSER: ${session.user.name}`)
+        });
+      } else {
+        return NextResponse.json({
+          message: '[INITIATING X NETWORK SYNC]\nRedirecting to authorization...',
+          dispatchEvent: 'CONNECT_TWITTER'
+        });
+      }
+    }
 
     // Handle help command
     if (message.toLowerCase() === 'help') {
@@ -164,6 +216,7 @@ export async function POST(request: Request) {
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.MANDATES);
       return NextResponse.json({
         message: `[MANDATE PROTOCOL BYPASSED]
 =============================
@@ -185,21 +238,6 @@ ACQUISITION STATUS UPDATED:
       });
     }
 
-
-    // Handle Twitter connection command
-    if (message.toLowerCase() === 'connect x account') {
-      if (session) {
-        return NextResponse.json({
-          message: AUTHENTICATED_MESSAGE.replace('ACCESS: GRANTED', `ACCESS: GRANTED\nUSER: ${session.user.name}`)
-        });
-      } else {
-        return NextResponse.json({
-          message: '[INITIATING X NETWORK SYNC]\nRedirecting to authorization...',
-          action: 'CONNECT_TWITTER'
-        });
-      }
-    }
-
     // Handle mandates command
     if (message.toLowerCase() === 'mandates') {
       if (!session) {
@@ -207,6 +245,7 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.MANDATES);
       return NextResponse.json({
         message: MANDATES_MESSAGE
       });
@@ -220,7 +259,7 @@ ACQUISITION STATUS UPDATED:
         });
       }
       try {
-        const response = await fetch('/api/twitter/follow', {
+        const response = await fetch(new URL('/api/twitter/follow', request.url).toString(), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -270,7 +309,7 @@ BYPASS OPTIONS:
         });
       }
       try {
-        const response = await fetch('/api/twitter/like', {
+        const response = await fetch(new URL('/api/twitter/like', request.url).toString(), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -324,6 +363,7 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
       return NextResponse.json({
         message: TELEGRAM_MESSAGE
       });
@@ -336,6 +376,10 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+      
+      // Skip showing the TELEGRAM_MESSAGE and go straight to bypass
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
+      
       return NextResponse.json({
         message: `[TELEGRAM SYNC BYPASSED]
 =============================
@@ -365,6 +409,7 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
       return NextResponse.json({
         message: VERIFICATION_MESSAGE
       });
@@ -377,6 +422,7 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
       return NextResponse.json({
         message: `[VERIFICATION PROTOCOL BYPASSED]
 =============================
@@ -406,6 +452,7 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
       return NextResponse.json({
         message: WALLET_MESSAGE
       });
@@ -418,6 +465,7 @@ ACQUISITION STATUS UPDATED:
           message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
         });
       }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
       return NextResponse.json({
         message: `[WALLET SUBMISSION BYPASSED]
 =============================
@@ -454,75 +502,99 @@ ACQUISITION STATUS UPDATED:
 
     // Handle generate code command
     if (message.toLowerCase() === 'generate code') {
-      if (!session) {
-        return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
-        });
+      const session = await getServerSession(authOptions);
+      if (!session?.user) {
+        return NextResponse.json({ message: 'Must be authenticated to generate code' });
       }
 
       try {
         const db = await initDb();
         
         // Check if user already has a code
-        const existingCode = await db.get(
-          'SELECT code FROM referral_codes WHERE twitter_id = ?',
-          [session.user.id]
-        );
+        const existingCode = await db.prepare(
+          'SELECT code FROM referral_codes WHERE twitter_id = ?'
+        ).get(session.user.id) as ReferralCode | undefined;
 
         if (existingCode) {
-          return NextResponse.json({
-            message: `[CODE ALREADY EXISTS]
+          return NextResponse.json({ 
+            message: `[REFERENCE CODE EXISTS]
 =============================
 YOUR REFERENCE CODE: ${existingCode.code}
 
->USE "submit code <CODE>" TO SUBMIT A DIFFERENT CODE
->USE "skip reference" TO BYPASS`
+[ACQUISITION PROTOCOL COMPLETE]
+==============================
+ALL STEPS VERIFIED
+SYSTEM ACCESS GRANTED
+
+>INITIALIZATION COMPLETE
+>AWAITING FURTHER INSTRUCTIONS...`,
+            commandComplete: true,
+            shouldAutoScroll: true
           });
         }
 
-        // Generate new code
-        const code = generateReferralCode(session.user.id, session.user.name);
+        // Generate and store new code
+        const referralCode = generateReferralCode(session.user.id, session.user.name);
         
-        await db.run(
-          'INSERT INTO referral_codes (twitter_id, twitter_name, code) VALUES (?, ?, ?)',
-          [session.user.id, session.user.name, code]
+        await db.prepare(
+          `INSERT INTO referral_codes (twitter_id, twitter_name, code, used_count) 
+           VALUES (?, ?, ?, 0)`
+        ).run(
+          session.user.id,
+          session.user.name,
+          referralCode
         );
-
-        return NextResponse.json({
-          message: `[CODE GENERATION COMPLETE]
+        
+        // Update session stage to complete
+        await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
+        
+        return NextResponse.json({ 
+          message: `[REFERENCE CODE GENERATED]
 =============================
-REFERENCE CODE CREATED
-YOUR CODE: ${code}
+YOUR REFERENCE CODE: ${referralCode}
 
->SHARE THIS CODE WITH OTHERS
->USE "submit code <CODE>" TO SUBMIT A DIFFERENT CODE
->USE "skip reference" TO BYPASS`
+[ACQUISITION PROTOCOL COMPLETE]
+==============================
+ALL STEPS VERIFIED
+SYSTEM ACCESS GRANTED
+
+>INITIALIZATION COMPLETE
+>AWAITING FURTHER INSTRUCTIONS...`,
+          commandComplete: true,
+          shouldAutoScroll: true
         });
       } catch (error) {
-        console.error('Error generating code:', error);
+        console.error('Error generating reference code:', error);
         return NextResponse.json({
-          message: 'ERROR: CODE GENERATION FAILED\nPLEASE TRY AGAIN'
+          message: 'ERROR: FAILED TO GENERATE REFERENCE CODE\nPLEASE TRY AGAIN'
         });
       }
     }
 
     // Handle submit code command
     if (message.toLowerCase().startsWith('submit code ')) {
+      const code = message.split(' ')[2];
+      if (!code) {
+        return NextResponse.json({ 
+          message: 'Invalid code format. Please use: submit code <CODE>' 
+        });
+      }
+
       if (!session) {
         return NextResponse.json({
           message: 'ERROR: X NETWORK CONNECTION REQUIRED'
         });
       }
 
-      const code = message.slice(12).trim();
-      
       try {
         const db = await initDb();
         
         // Check if code exists and wasn't created by the same user
-        const referralCode = await db.get(
-          'SELECT * FROM referral_codes WHERE code = ? AND twitter_id != ?',
-          [code, session.user.id]
+        const referralCode = await db.prepare(
+          'SELECT * FROM referral_codes WHERE code = ? AND twitter_id != ?'
+        ).get(
+          code,
+          session.user.id
         );
 
         if (!referralCode) {
@@ -532,9 +604,10 @@ YOUR CODE: ${code}
         }
 
         // Check if user already used a code
-        const existingUse = await db.get(
-          'SELECT * FROM referral_uses WHERE used_by_twitter_id = ?',
-          [session.user.id]
+        const existingUse = await db.prepare(
+          'SELECT * FROM referral_uses WHERE used_by_twitter_id = ?'
+        ).get(
+          session.user.id
         );
 
         if (existingUse) {
@@ -544,17 +617,23 @@ YOUR CODE: ${code}
         }
 
         // Record code use
-        await db.run(
-          'INSERT INTO referral_uses (code, used_by_twitter_id) VALUES (?, ?)',
-          [code, session.user.id]
+        await db.prepare(
+          'INSERT INTO referral_uses (code, used_by_twitter_id) VALUES (?, ?)'
+        ).run(
+          code,
+          session.user.id
         );
 
         // Update use count
-        await db.run(
-          'UPDATE referral_codes SET used_count = used_count + 1 WHERE code = ?',
-          [code]
+        await db.prepare(
+          'UPDATE referral_codes SET used_count = used_count + 1 WHERE code = ?'
+        ).run(
+          code
         );
 
+        // Update session stage to complete
+        await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
+        
         return NextResponse.json({
           message: `[REFERENCE CODE ACCEPTED]
 =============================
@@ -593,6 +672,7 @@ SYSTEM ACCESS GRANTED
           message: 'ERROR: X NETWORK CONNECTION REQUIRED'
         });
       }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
       return NextResponse.json({
         message: `[REFERENCE CODE BYPASSED]
 =============================
@@ -618,6 +698,7 @@ SYSTEM ACCESS GRANTED
           message: 'ERROR: X NETWORK CONNECTION REQUIRED'
         });
       }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
       return NextResponse.json({
         message: `[TELEGRAM JOIN COMPLETE]
 =============================
@@ -648,6 +729,7 @@ ACQUISITION STATUS UPDATED:
         });
       }
       // Add your code verification logic here
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
       return NextResponse.json({
         message: `[VERIFICATION COMPLETE]
 =============================
@@ -678,6 +760,7 @@ ACQUISITION STATUS UPDATED:
         });
       }
       // Add your wallet validation logic here
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
       return NextResponse.json({
         message: `[WALLET SUBMISSION COMPLETE]
 =============================
@@ -700,6 +783,53 @@ ACQUISITION STATUS UPDATED:
       });
     }
 
+    // Handle show referral code command
+    if (message.toLowerCase() === 'show referral code') {
+      if (!session) {
+        return NextResponse.json({
+          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+        });
+      }
+
+      try {
+        const db = await initDb();
+        
+        // Check if user has a code
+        const existingCode = await db.prepare(
+          'SELECT code FROM referral_codes WHERE twitter_id = ?'
+        ).get(
+          session.user.id
+        ) as Pick<ReferralCode, 'code'> | undefined;
+
+        if (!existingCode) {
+          return NextResponse.json({
+            message: `[NO REFERENCE CODE FOUND]
+=============================
+You haven't generated a reference code yet.
+
+>TYPE "generate code" TO CREATE ONE
+>TYPE "submit code <CODE>" TO SUBMIT A DIFFERENT CODE
+>TYPE "skip reference" TO BYPASS`
+          });
+        }
+
+        return NextResponse.json({
+          message: `[REFERENCE CODE RETRIEVED]
+=============================
+YOUR REFERENCE CODE: ${existingCode.code}
+
+>SHARE THIS CODE WITH OTHERS
+>USE "submit code <CODE>" TO SUBMIT A DIFFERENT CODE
+>USE "skip reference" TO BYPASS`
+        });
+      } catch (error) {
+        console.error('Error retrieving code:', error);
+        return NextResponse.json({
+          message: 'ERROR: FAILED TO RETRIEVE REFERENCE CODE\nPLEASE TRY AGAIN'
+        });
+      }
+    }
+
     // Handle other messages
     const response = {
       message: `Echo: ${message}`,
@@ -709,6 +839,7 @@ ACQUISITION STATUS UPDATED:
     return NextResponse.json(response);
 
   } catch (error) {
+    console.error('Error in chat route:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal Server Error' },
       { status: 500 }

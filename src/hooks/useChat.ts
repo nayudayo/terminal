@@ -128,7 +128,6 @@ useEffect(() => {
       content: WALLET_MESSAGE,
       timestamp: Date.now(),
     }]);
-    await markMessageAsShown(userId, 'wallet_submit_message');
     await updateSessionStage(SessionStage.WALLET_SUBMIT);
   }, [userId, updateSessionStage]);
 
@@ -139,7 +138,6 @@ useEffect(() => {
       content: TELEGRAM_MESSAGE,
       timestamp: Date.now(),
     }]);
-    await markMessageAsShown(userId, 'telegram_redir_message');
     await updateSessionStage(SessionStage.TELEGRAM_REDIRECT);
   }, [userId, updateSessionStage]);
 
@@ -150,9 +148,6 @@ useEffect(() => {
       content: POST_PUSH_MESSAGE,
       timestamp: Date.now(),
     }]);
-    await markMessageAsShown(userId, 'connect_x_message');
-    
-    // Ensure we're updating to the correct stage
     await updateSessionStage(SessionStage.CONNECT_TWITTER);
   }, [userId, updateSessionStage]);
 
@@ -163,7 +158,6 @@ useEffect(() => {
       content: MANDATES_MESSAGE,
       timestamp: Date.now(),
     }]);
-      await markMessageAsShown(userId, 'mandates_message_shown');
     
     // Create initial session
     const response = await fetch('/api/session/create', {
@@ -188,7 +182,6 @@ useEffect(() => {
       content: VERIFICATION_MESSAGE,
       timestamp: Date.now(),
     }]);
-    await markMessageAsShown(userId, 'telegram_code_message');
     await updateSessionStage(SessionStage.TELEGRAM_CODE);
   }, [userId, updateSessionStage]);
   
@@ -200,7 +193,6 @@ useEffect(() => {
       content: REFERENCE_MESSAGE,
       timestamp: Date.now(),
     }]);
-    await markMessageAsShown(userId, 'reference_code_message');
     await updateSessionStage(SessionStage.REFERENCE_CODE);
   }, [userId, updateSessionStage]);
   
@@ -211,7 +203,6 @@ useEffect(() => {
       content: PROTOCOL_COMPLETE_MESSAGE,
       timestamp: Date.now(),
     }]);
-    await markMessageAsShown(userId, 'protocol_complete_message');
     await updateSessionStage(SessionStage.PROTOCOL_COMPLETE);
   }, [userId, updateSessionStage]);
 
@@ -322,19 +313,6 @@ useEffect(() => {
     }, [userId]);
 
 
-  // mark messages as shown in the db
-  const markMessageAsShown = async (userId: string, messageType: string) => {
-    try {
-      await fetch('/api/messages/mark-shown', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, messageType }),
-      });
-    } catch (error) {
-      console.error('Error marking message as shown:', error);
-    }
-  }
-
   // Handle submit
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,7 +341,6 @@ useEffect(() => {
           isIntro: true,
           showButton: true
         }]);
-        markMessageAsShown(userId, 'post_push_message');
         setIsLoading(false);
         setIsTyping(false);
       }, 1000);
@@ -384,7 +361,6 @@ useEffect(() => {
         content: TELEGRAM_REDIRECT_MESSAGE,
         timestamp: Date.now(),
       }]);
-      markMessageAsShown(userId, 'telegram_redir_message');
       setIsLoading(false);
       setIsTyping(false);
       return;
@@ -459,7 +435,6 @@ STATUS: VERIFIED ✓
 >Type "help" to see available commands`,
         timestamp: Date.now(),
       }]);
-      markMessageAsShown(userId, 'wallet_submit_shown');
       setIsLoading(false);
       setIsTyping(false);
       return;
@@ -559,6 +534,7 @@ STATUS: VERIFIED ✓
       setCanType(false);
       const cachedState = await getCachedState(userId);
       const now = Date.now();
+      
       if (cachedState && now - cachedState.timestamp < CACHE_DURATION) {
         setMessages(cachedState.messages);
         setCompletionStatus(cachedState.completionStatus);
@@ -568,32 +544,39 @@ STATUS: VERIFIED ✓
         setCanType(true);
         return;
       }
-  
+
+      // Get current session stage first
+      const response = await fetch(`/api/session?userId=${userId}`);
+      const data = await response.json();
+      const currentStage = data.session?.stage || SessionStage.INTRO_MESSAGE;
+
+      // Set initial message based on stage
       const initialMessage: Message = session?.user 
-      ? {
-          id: uuidv4(),
-          role: 'assistant',
-          content: AUTHENTICATED_MESSAGE,
-          timestamp: Date.now(),
-          isIntro: true,
-          isAuthenticated: true
-        }
-      : {
-          id: uuidv4(),
-          role: 'assistant',
-          content: INTRO_MESSAGE,
-          timestamp: Date.now(),
-          isIntro: true
-        };
+        ? {
+            id: uuidv4(),
+            role: 'assistant',
+            content: currentStage === SessionStage.PROTOCOL_COMPLETE 
+              ? PROTOCOL_COMPLETE_MESSAGE 
+              : AUTHENTICATED_MESSAGE,
+            timestamp: Date.now(),
+            isIntro: true,
+            isAuthenticated: true
+          }
+        : {
+            id: uuidv4(),
+            role: 'assistant',
+            content: INTRO_MESSAGE,
+            timestamp: Date.now(),
+            isIntro: true
+          };
 
-    setMessages([initialMessage]);
-    // Don't enable typing here - let the typewriter effect control it
+      setMessages([initialMessage]);
+      setSessionStage(currentStage);
+      await updateSessionStage(currentStage);
+    };
 
-    await markMessageAsShown(userId, 'intro_message');
-    await updateSessionStage(SessionStage.INTRO_MESSAGE);
-  };
-  initializeChat();
-}, [session, userId, getCachedState, CACHE_DURATION, updateSessionStage]);
+    initializeChat();
+  }, [session, userId, getCachedState, CACHE_DURATION, updateSessionStage]);
 
   // Cache state updates
   useEffect(() => {

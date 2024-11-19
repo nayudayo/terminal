@@ -6,22 +6,45 @@ import { useSession } from 'next-auth/react';
 interface AuthCheckModalProps {
   isOpen: boolean;
   onAuthConfirmed: () => void;
+  delayShow?: boolean;
 }
 
-export default function AuthCheckModal({ isOpen, onAuthConfirmed }: AuthCheckModalProps) {
+export default function AuthCheckModal({ isOpen, onAuthConfirmed, delayShow = false }: AuthCheckModalProps) {
   const { data: session, status } = useSession();
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [shouldShow, setShouldShow] = useState(!delayShow);
 
+  // Handle delayed showing of modal
   useEffect(() => {
-    if (isOpen) {
+    if (delayShow && isOpen) {
+      // Reset state when modal is opened
+      setShouldShow(false);
+      setIsVisible(false);
+      
+      // Set timer for 10 second delay
+      const timer = setTimeout(() => {
+        console.log('[Auth Modal] Showing after delay');
+        setShouldShow(true);
+      }, 10000);
+      
+      return () => clearTimeout(timer);
+    } else if (!delayShow) {
+      // If no delay required, show immediately
+      setShouldShow(true);
+    }
+  }, [delayShow, isOpen]);
+
+  // Handle visibility transitions
+  useEffect(() => {
+    if (isOpen && shouldShow) {
       setIsVisible(true);
     } else {
       const timer = setTimeout(() => setIsVisible(false), 300);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, shouldShow]);
 
   const handleCheck = async () => {
     setIsChecking(true);
@@ -40,12 +63,15 @@ export default function AuthCheckModal({ isOpen, onAuthConfirmed }: AuthCheckMod
     }
   };
 
-  if (!isVisible) return null;
+  if (!isVisible || !shouldShow) return null;
 
   return (
     <div 
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm
+      className={`fixed inset-0 z-30 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm
         transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
+      style={{ 
+        zIndex: delayShow ? 30 : 40  // Lower z-index when shown after delay
+      }}
     >
       <div 
         className={`bg-black border border-[#FF0000]/20 p-6 rounded-lg shadow-lg max-w-md w-full

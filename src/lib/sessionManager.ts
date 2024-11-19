@@ -222,20 +222,19 @@ export class SessionManager {
           }
           
           if (message.toLowerCase() === 'generate code') {
-            console.log(`[Stage Transition] REFERENCE_CODE -> PROTOCOL_COMPLETE (Generate)`);
-            await this.updateSessionStage(userId, SessionStage.PROTOCOL_COMPLETE);
+            console.log(`[Stage Transition] Handling generate code command`);
+            // Don't transition stage here - let the route handler do it
+            // Just return null for newStage to let route handler take over
             return {
-              newStage: SessionStage.PROTOCOL_COMPLETE,
-              response: STAGE_PROMPTS[SessionStage.PROTOCOL_COMPLETE].example_responses[0]
+              response: 'Generating reference code...'
             };
           }
           
           if (message.toLowerCase().startsWith('submit code ')) {
-            console.log(`[Stage Transition] REFERENCE_CODE -> PROTOCOL_COMPLETE (Submit)`);
-            await this.updateSessionStage(userId, SessionStage.PROTOCOL_COMPLETE);
+            console.log(`[Stage Transition] Handling submit code command`);
+            // Same here - let route handler manage the code submission
             return {
-              newStage: SessionStage.PROTOCOL_COMPLETE,
-              response: STAGE_PROMPTS[SessionStage.PROTOCOL_COMPLETE].example_responses[0]
+              response: 'Processing reference code submission...'
             };
           }
           break;

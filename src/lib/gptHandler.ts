@@ -114,7 +114,7 @@ export function isValidStage(stage: number): boolean {
 
 // Helper function to check if message is a command
 export function isCommand(message: string): boolean {
-  const commands = [
+  const exactCommands = [
     'help',
     'mandates',
     'skip mandates',
@@ -131,5 +131,22 @@ export function isCommand(message: string): boolean {
     'generate code',
     'show referral code'
   ];
-  return commands.includes(message.toLowerCase());
+  
+  // Convert message to lowercase for comparison
+  const lowerMessage = message.toLowerCase();
+  
+  // Check exact matches first
+  if (exactCommands.includes(lowerMessage)) {
+    return true;
+  }
+  
+  // Check prefix matches
+  const prefixCommands = [
+    'submit code ',
+    'wallet ',
+    'verify '
+  ];
+  
+  // Check if message starts with any of the prefix commands
+  return prefixCommands.some(cmd => lowerMessage.startsWith(cmd));
 }

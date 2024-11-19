@@ -19,14 +19,6 @@ export async function initDb() {
       
       // Initialize tables
       db.exec(`
-        CREATE TABLE IF NOT EXISTS message_tracking (
-          user_id TEXT PRIMARY KEY,
-          intro_message_shown BOOLEAN DEFAULT FALSE,
-          post_push_message_shown BOOLEAN DEFAULT FALSE,
-          connect_x_message_shown BOOLEAN DEFAULT FALSE,
-          mandates_message_shown BOOLEAN DEFAULT FALSE
-        );
-
         CREATE TABLE IF NOT EXISTS user_sessions (
           user_id TEXT PRIMARY KEY,
           stage INTEGER NOT NULL DEFAULT 1,
@@ -61,23 +53,6 @@ export async function closeDb() {
     await db.close();
     db = null;
   }
-}
-
-export async function markMessageAsShown(userId: string, messageType: string) {
-  const db = await initDb();
-  const column = `${messageType}_shown`;
-  
-  await db.prepare(
-    `INSERT OR IGNORE INTO message_tracking (user_id) VALUES (?)`
-  ).run(
-    userId
-  );
-
-  await db.prepare(
-    `UPDATE message_tracking SET ${column} = TRUE WHERE user_id = ?`
-  ).run(
-    userId
-  );
 }
 
 export async function linkOriginalUserId(twitterId: string, originalUserId: string) {

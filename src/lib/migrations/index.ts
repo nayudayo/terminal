@@ -38,27 +38,6 @@ const migrations: Migration[] = [
           UNIQUE(code, used_by_twitter_id)
         );
 
-        CREATE TABLE IF NOT EXISTS schema_migrations (
-          version INTEGER PRIMARY KEY,
-          name TEXT NOT NULL,
-          executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS message_tracking (
-          user_id TEXT PRIMARY KEY,
-          intro_message_shown BOOLEAN DEFAULT FALSE,
-          post_push_message_shown BOOLEAN DEFAULT FALSE,
-          connect_x_message_shown BOOLEAN DEFAULT FALSE,
-          mandates_message_shown BOOLEAN DEFAULT FALSE,
-          telegram_message_shown BOOLEAN DEFAULT FALSE,
-          telegram_redir_message_shown BOOLEAN DEFAULT FALSE,
-          telegram_code_message_shown BOOLEAN DEFAULT FALSE,
-          wallet_submit_message_shown BOOLEAN DEFAULT FALSE,
-          wallet_submit_shown_shown BOOLEAN DEFAULT FALSE,
-          reference_code_message_shown BOOLEAN DEFAULT FALSE,
-          protocol_complete_message_shown BOOLEAN DEFAULT FALSE
-        );
-
         CREATE INDEX IF NOT EXISTS idx_referral_codes_twitter_id 
         ON referral_codes(twitter_id);
       `);
@@ -67,7 +46,6 @@ const migrations: Migration[] = [
       await db.exec(`
         DROP TABLE IF EXISTS referral_uses;
         DROP TABLE IF EXISTS referral_codes;
-        DROP TABLE IF EXISTS message_tracking;
       `);
     }
   }

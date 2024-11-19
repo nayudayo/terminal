@@ -15,6 +15,7 @@ import {
   PROTOCOL_MESSAGES,
   RESPONSE_MESSAGES,
   WALLET_ERROR_MESSAGES,
+  PROTOCOL_COMPLETE_MESSAGE,
 } from '@/constants/messages';
 import { SessionManager } from '@/lib/sessionManager';
 import { SessionStage } from '@/types/session';
@@ -26,6 +27,7 @@ import {
   parseWalletCommand, 
   verifyWalletTransaction 
 } from '@/lib/walletValidator';
+import { STAGE_PROMPTS } from '@/constants/prompts';
 
 interface ReferralCode {
   code: string;
@@ -35,81 +37,56 @@ interface ReferralCode {
   created_at: string;
 }
 
-// Add this function at the top to get stage-specific messages
+// Update the getStageMessage function to be more comprehensive
 function getStageMessage(stage: SessionStage): string {
   switch (stage) {
+    case SessionStage.INTRO_MESSAGE:
+      return STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0];
+    
+    case SessionStage.POST_PUSH_MESSAGE:
+      return STAGE_PROMPTS[SessionStage.POST_PUSH_MESSAGE].example_responses[0];
+    
+    case SessionStage.CONNECT_TWITTER:
+      return STAGE_PROMPTS[SessionStage.CONNECT_TWITTER].example_responses[0];
+    
+    case SessionStage.AUTHENTICATED:
+      return AUTHENTICATED_MESSAGE;
+    
     case SessionStage.MANDATES:
       return MANDATES_MESSAGE;
+    
     case SessionStage.TELEGRAM_REDIRECT:
       return TELEGRAM_MESSAGE;
+    
     case SessionStage.TELEGRAM_CODE:
       return VERIFICATION_MESSAGE;
+    
     case SessionStage.WALLET_SUBMIT:
       return WALLET_MESSAGE;
+    
     case SessionStage.REFERENCE_CODE:
       return REFERENCE_MESSAGE;
+    
     case SessionStage.PROTOCOL_COMPLETE:
-      return `[PROTOCOL COMPLETE]
-=============================
-ALL STEPS VERIFIED
-SYSTEM ACCESS GRANTED
-
->INITIALIZATION COMPLETE
->AWAITING FURTHER INSTRUCTIONS...`;
+      return PROTOCOL_COMPLETE_MESSAGE;
+    
     default:
-      return AUTHENTICATED_MESSAGE;
+      return HELP_MESSAGE;
   }
 }
 
-// Add interface for SQLite user session
-interface DBUserSession {
-  user_id: string;
-  stage: number;
-  twitter_id: string | null;
-  original_user_id: string | null;
-  access_token: string | null;
-  last_active: number | null;
-  created_at: string;
-}
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     const { message, userId } = await request.json();
 
-    // Handle Twitter connection command first
-    if (message.toLowerCase() === 'connect x account') {
-      if (session) {
-        // If already authenticated, update stage and show authenticated message
-        await SessionManager.updateSessionStage(session.user.id, SessionStage.AUTHENTICATED);
-        
-        // Mark connect_x_message as shown
-        const db = await initDb();
-        await db.prepare(
-          `UPDATE message_tracking 
-           SET connect_x_message_shown = TRUE 
-           WHERE user_id = ?`
-        ).run(session.user.id);
-
-        return NextResponse.json({
-          message: AUTHENTICATED_MESSAGE.replace('ACCESS: GRANTED', `ACCESS: GRANTED\nUSER: ${session.user.name}`),
-          shouldAutoScroll: true
-        });
-      } else {
-        // If not authenticated, trigger Twitter auth
-        return NextResponse.json({
-          message: PROTOCOL_MESSAGES.TWITTER_AUTH.INITIATING,
-          dispatchEvent: 'CONNECT_TWITTER',
-          shouldAutoScroll: true
-        });
-      }
-    }
-
-    // Then handle LOAD_CURRENT_STAGE
+    // Handle LOAD_CURRENT_STAGE first
     if (message === 'LOAD_CURRENT_STAGE') {
       if (!session?.user?.id) {
+        // For unauthenticated users, return the intro message
         return NextResponse.json({
-          message: AUTHENTICATED_MESSAGE
+          message: STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0]
         });
       }
 
@@ -122,6 +99,7 @@ export async function POST(request: Request) {
           console.log(`[New Session Created] User: ${session.user.id}, Stage: ${currentSession.stage}`);
         }
 
+        // Return the appropriate message for their current stage
         console.log(`[Loading Stage] User: ${session.user.id}, Stage: ${currentSession.stage}`);
         return NextResponse.json({
           message: getStageMessage(currentSession.stage)
@@ -130,6 +108,26 @@ export async function POST(request: Request) {
         console.error('Error loading stage:', error);
         return NextResponse.json({
           message: PROTOCOL_MESSAGES.LOAD_STAGE.ERROR.SESSION_NOT_FOUND
+        });
+      }
+    }
+
+    // Handle Twitter connection command first
+    if (message.toLowerCase() === 'connect x account') {
+      if (session) {
+        // If already authenticated, update stage and show authenticated message
+        await SessionManager.updateSessionStage(session.user.id, SessionStage.AUTHENTICATED);
+        
+        return NextResponse.json({
+          message: AUTHENTICATED_MESSAGE.replace('ACCESS: GRANTED', `ACCESS: GRANTED\nUSER: ${session.user.name}`),
+          shouldAutoScroll: true
+        });
+      } else {
+        // If not authenticated, trigger Twitter auth
+        return NextResponse.json({
+          message: PROTOCOL_MESSAGES.TWITTER_AUTH.INITIATING,
+          dispatchEvent: 'CONNECT_TWITTER',
+          shouldAutoScroll: true
         });
       }
     }
@@ -160,7 +158,7 @@ export async function POST(request: Request) {
         console.log(`[New Session Created] User: ${session.user.id}, Stage: ${currentSession.stage}`);
       }
       
-      // If they've completed the protocol, allow free chat with stage-aware prompting
+      // If they've completed the protocol, allow free chat
       if (currentSession.stage === SessionStage.PROTOCOL_COMPLETE) {
         const aiResponse = await generateResponse(message, SessionStage.PROTOCOL_COMPLETE);
         return NextResponse.json({
@@ -195,14 +193,10 @@ export async function POST(request: Request) {
           shouldAutoScroll: true
         });
       }
-
-      // ... rest of command handling ...
     } else {
-      // Allow free chat without authentication
-      const aiResponse = await generateResponse(message, SessionStage.INTRO_MESSAGE);
+      // For unauthenticated users, return intro message instead of free chat
       return NextResponse.json({
-        message: aiResponse,
-        shouldAutoScroll: true
+        message: STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0]
       });
     }
 
@@ -556,13 +550,13 @@ export async function POST(request: Request) {
       try {
         const db = await initDb();
         
-        // Check if user already has a code
+        // First check if user already has a code
         const existingCode = await db.prepare(
           'SELECT code FROM referral_codes WHERE twitter_id = ?'
         ).get(session.user.id) as ReferralCode | undefined;
 
         if (existingCode) {
-          // Update session to PROTOCOL_COMPLETE
+          // If they have a code, show it and complete protocol
           await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
           
           return NextResponse.json({ 
@@ -573,10 +567,10 @@ export async function POST(request: Request) {
           });
         }
 
-        // Generate new code
+        // If no existing code, generate a new one
         const code = await generateReferralCode(session.user.id, session.user.name || 'USER');
         
-        // Update session to PROTOCOL_COMPLETE
+        // After successful generation, update stage
         await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
 
         return NextResponse.json({
@@ -611,7 +605,7 @@ export async function POST(request: Request) {
       try {
         const db = await initDb();
         
-        // Check if code exists and wasn't created by the same user
+        // Verify code first
         const referralCode = await db.prepare(
           'SELECT * FROM referral_codes WHERE code = ? AND twitter_id != ?'
         ).get(code, session.user.id);
@@ -643,7 +637,7 @@ export async function POST(request: Request) {
           'UPDATE referral_codes SET used_count = used_count + 1 WHERE code = ?'
         ).run(code);
 
-        // Update session to PROTOCOL_COMPLETE
+        // Only after successful code submission, update stage
         await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
 
         return NextResponse.json({

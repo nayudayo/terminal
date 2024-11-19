@@ -1,5 +1,6 @@
 import { getRedisClient } from './redis';
 import { SessionStage, UserSession } from '@/types/session';
+import { STAGE_PROMPTS } from '@/constants/prompts';
 
 export class SessionManager {
   private static readonly KEY_PREFIX = 'session:';
@@ -115,5 +116,47 @@ export class SessionManager {
       console.error(`[Session Creation Failed] User: ${userId}, Error:`, error);
       return null;
     }
+  }
+
+  static async handleStageTransition(
+    userId: string,
+    currentStage: SessionStage,
+    message: string
+  ): Promise<{ newStage?: SessionStage; response: string }> {
+    const stagePrompt = STAGE_PROMPTS[currentStage];
+    
+    switch (currentStage) {
+      case SessionStage.INTRO_MESSAGE:
+        if (message.toLowerCase() === 'up_push_button') {
+          return {
+            newStage: SessionStage.POST_PUSH_MESSAGE,
+            response: STAGE_PROMPTS[SessionStage.POST_PUSH_MESSAGE].example_responses[0]
+          };
+        }
+        break;
+
+      case SessionStage.POST_PUSH_MESSAGE:
+        return {
+          newStage: SessionStage.CONNECT_TWITTER,
+          response: STAGE_PROMPTS[SessionStage.CONNECT_TWITTER].example_responses[0]
+        };
+
+      case SessionStage.CONNECT_TWITTER:
+        // Handle in TwitterConnect component
+        break;
+
+      case SessionStage.AUTHENTICATED:
+        return {
+          newStage: SessionStage.MANDATES,
+          response: STAGE_PROMPTS[SessionStage.MANDATES].example_responses[0]
+        };
+    }
+
+    // Return default response if no transition
+    return {
+      response: stagePrompt.example_responses[
+        Math.floor(Math.random() * stagePrompt.example_responses.length)
+      ]
+    };
   }
 } 

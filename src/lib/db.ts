@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { rateLimit } from '@/lib/rateLimit';
 
 let db: Database.Database | null = null;
 
@@ -88,13 +89,69 @@ export async function linkOriginalUserId(twitterId: string, originalUserId: stri
   );
 }
 
-export function generateReferralCode(twitterId: string, twitterName: string): string {
-  // Generate a unique code based on Twitter ID and name
+// Add helper for code generation
+function generateUniqueCode(twitterName: string): string {
   const prefix = twitterName.slice(0, 3).toUpperCase();
   const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-  const suffix = twitterId.slice(-3);
+  const timestamp = Date.now().toString(36).slice(-3).toUpperCase();
   
-  return `${prefix}-${randomPart}-${suffix}`;
+  return `${prefix}-${randomPart}-${timestamp}`;
+}
+
+// Add validation function
+async function isCodeUnique(db: Database.Database, code: string): Promise<boolean> {
+  const existing = await db.prepare(
+    'SELECT code FROM referral_codes WHERE code = ?'
+  ).get(code);
+  
+  return !existing;
+}
+
+export async function generateReferralCode(
+  twitterId: string, 
+  twitterName: string
+): Promise<string> {
+  const db = await initDb();
+  
+  // Check rate limit (5 attempts per hour)
+  const rateLimitKey = `generate_code:${twitterId}`;
+  const isRateLimited = await rateLimit(rateLimitKey, 5, 3600);
+  
+  if (isRateLimited) {
+    throw new Error('Rate limit exceeded. Please try again later.');
+  }
+
+  // Try up to 3 times to generate a unique code
+  let attempts = 0;
+  let code: string;
+  
+  do {
+    code = generateUniqueCode(twitterName);
+    const unique = await isCodeUnique(db, code);
+    
+    if (unique) {
+      // Insert the code
+      await db.prepare(
+        `INSERT INTO referral_codes (
+          code, 
+          twitter_id, 
+          twitter_name, 
+          used_count, 
+          created_at
+        ) VALUES (?, ?, ?, 0, datetime('now'))`
+      ).run(
+        code,
+        twitterId,
+        twitterName
+      );
+      
+      return code;
+    }
+    
+    attempts++;
+  } while (attempts < 3);
+
+  throw new Error('Failed to generate unique code. Please try again.');
 }
 
 export async function createUserMapping(originalUserId: string) {

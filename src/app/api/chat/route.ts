@@ -2,7 +2,19 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/auth';
 import { generateReferralCode, initDb } from '@/lib/db';
-import { UP_PUSH_RESPONSE_ART } from '@/constants/messages';
+import { 
+  HELP_MESSAGE, 
+  MANDATES_MESSAGE,
+  TELEGRAM_MESSAGE,
+  VERIFICATION_MESSAGE,
+  WALLET_MESSAGE,
+  REFERENCE_MESSAGE,
+  AUTHENTICATED_MESSAGE,
+  PROTOCOL_COMPLETE_MESSAGE,
+  ERROR_MESSAGES,
+  SUCCESS_MESSAGES,
+  RESPONSE_MESSAGES
+} from '@/constants/messages';
 import { SessionManager } from '@/lib/sessionManager';
 import { SessionStage } from '@/types/session';
 import { generateResponse } from '@/lib/gptHandler';
@@ -14,147 +26,6 @@ interface ReferralCode {
   used_count: number;
   created_at: string;
 }
-
-const HELP_MESSAGE = `
-[ACQUISITION PROTOCOL INITIALIZED]
-================================
-
-REQUIRED STEPS: [1/5]
---------------------
-1. MANDATES [PENDING]
-   >TYPE "mandates" TO BEGIN
-   >TYPE "skip mandates" TO BYPASS
-
-2. TELEGRAM SYNC [LOCKED]
-3. VERIFICATION CODE [LOCKED]
-4. WALLET SUBMISSION [LOCKED]
-5. REFERENCE CODE [LOCKED]
-
->COMPLETE STEPS IN SEQUENCE
->EXACT SYNTAX REQUIRED
-`;
-
-const MANDATES_MESSAGE = `
-[MANDATE PROTOCOL INITIATED]
-===========================
-
-STEP [1/5]: MANDATES
--------------------
-TWO (2) MANDATES MUST BE FULFILLED:
-
-1. FOLLOW MANDATE [PENDING]
-   >TYPE "follow ptb" TO EXECUTE
-
-2. LIKE MANDATE [PENDING]
-   >TYPE "like ptb" TO EXECUTE
-
-BYPASS OPTION:
--------------
->TYPE "skip mandates" TO BYPASS ALL MANDATES
-
-WARNING: EXACT SYNTAX REQUIRED
-AWAITING USER INPUT...
-`;
-
-const TELEGRAM_MESSAGE = `
-[TELEGRAM SYNC PROTOCOL INITIATED]
-================================
-
-STEP [2/5]: TELEGRAM SYNC
-------------------------
-SYNC REQUIREMENTS:
-1. JOIN TELEGRAM GROUP
-   >TYPE "join telegram" TO PROCEED
-   >TYPE "skip telegram" TO BYPASS
-
-BYPASS OPTION:
--------------
->TYPE "skip telegram" TO BYPASS
-
-WARNING: EXACT SYNTAX REQUIRED
-AWAITING USER INPUT...
-`;
-
-const VERIFICATION_MESSAGE = `
-[VERIFICATION PROTOCOL INITIATED]
-================================
-
-STEP [3/5]: VERIFICATION CODE
----------------------------
-VERIFICATION REQUIREMENTS:
-1. ENTER VERIFICATION CODE
-   >TYPE "verify <code>" TO PROCEED
-   >TYPE "skip verify" TO BYPASS
-
-WARNING: EXACT SYNTAX REQUIRED
-AWAITING USER INPUT...
-`;
-
-const WALLET_MESSAGE = `
-[WALLET SUBMISSION PROTOCOL INITIATED]
-====================================
-
-STEP [4/5]: WALLET SUBMISSION
----------------------------
-SUBMISSION REQUIREMENTS:
-1. ENTER WALLET ADDRESS
-   >TYPE "wallet <address>" TO PROCEED
-   >TYPE "skip wallet" TO BYPASS
-
-WARNING: EXACT SYNTAX REQUIRED
-AWAITING USER INPUT...
-`;
-
-const REFERENCE_MESSAGE = `
-[REFERENCE CODE PROTOCOL INITIATED]
-==================================
-
-STEP [5/5]: REFERENCE CODE
--------------------------
-SELECT ACTION:
-1. GENERATE NEW CODE
-   >TYPE "generate code" TO CREATE
-
-2. SUBMIT EXISTING CODE
-   >TYPE "submit code <CODE>" TO VERIFY
-   >TYPE "skip reference" TO BYPASS
-
-WARNING: EXACT SYNTAX REQUIRED
-AWAITING USER INPUT...
-`;
-
-const AUTHENTICATED_MESSAGE = `[SYSTEM STATUS: AUTHENTICATED]
-=============================
-
-DIGITAL BRIDGE PROTOCOL v2.1
----------------------------
-STATUS: ACTIVE
-SIGNAL: STRONG
-FREQUENCY: STABILIZED
-
-X NETWORK INTERFACE
-------------------
-SYNC: COMPLETE
-ACCESS: GRANTED
-CLEARANCE: LEVEL 3
-
-[ACQUISITION PROTOCOL INITIALIZED]
-================================
-
-REQUIRED STEPS: [1/5]
---------------------
-1. MANDATES [PENDING]
-   >TYPE "mandates" TO BEGIN
-   >TYPE "skip mandates" TO BYPASS
-
-2. TELEGRAM SYNC [LOCKED]
-3. VERIFICATION CODE [LOCKED]
-4. WALLET SUBMISSION [LOCKED]
-5. REFERENCE CODE [LOCKED]
-
->COMPLETE STEPS IN SEQUENCE
->EXACT SYNTAX REQUIRED
->TYPE "help" TO SHOW THIS MESSAGE AGAIN`;
 
 // Add this function at the top to get stage-specific messages
 function getStageMessage(stage: SessionStage): string {
@@ -170,13 +41,7 @@ function getStageMessage(stage: SessionStage): string {
     case SessionStage.REFERENCE_CODE:
       return REFERENCE_MESSAGE;
     case SessionStage.PROTOCOL_COMPLETE:
-      return `[PROTOCOL COMPLETE]
-=============================
-ALL STEPS VERIFIED
-SYSTEM ACCESS GRANTED
-
->INITIALIZATION COMPLETE
->AWAITING FURTHER INSTRUCTIONS...`;
+      return PROTOCOL_COMPLETE_MESSAGE;
     default:
       return AUTHENTICATED_MESSAGE;
   }
@@ -423,7 +288,7 @@ BYPASS OPTIONS:
     if (message.toLowerCase() === 'like ptb') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
       try {
@@ -438,38 +303,19 @@ BYPASS OPTIONS:
         
         if (response.ok) {
           return NextResponse.json({
-            message: `[MANDATE PROTOCOL COMPLETE]
-=============================
-ALL MANDATES FULFILLED
-
-STEP STATUS: [1/5] COMPLETE
---------------------------
-MANDATES:
-1. FOLLOW PTB [COMPLETE] ■
-2. LIKE PTB [COMPLETE] 
-
-ACQUISITION STATUS UPDATED:
--------------------------
-1. MANDATES [COMPLETE]
-2. TELEGRAM SYNC [UNLOCKED]
-   >TYPE "telegram" TO PROCEED
-3. VERIFICATION CODE [LOCKED]
-4. WALLET SUBMISSION [LOCKED]
-5. REFERENCE CODE [LOCKED]
-
->PROCEED TO NEXT STEP`,
+            message: SUCCESS_MESSAGES.LIKE_COMPLETE,
             commandComplete: true,
             shouldAutoScroll: true
           });
         } else {
           return NextResponse.json({
-            message: 'ERROR: LIKE MANDATE FAILED\nPLEASE TRY AGAIN'
+            message: ERROR_MESSAGES.LIKE_FAILED
           });
         }
       } catch (error) {
         console.error(error);
         return NextResponse.json({
-          message: 'ERROR: LIKE MANDATE FAILED\nPLEASE TRY AGAIN'
+          message: ERROR_MESSAGES.LIKE_FAILED
         });
       }
     }
@@ -478,17 +324,15 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase() === 'telegram') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
 
-      // Get current session to check stage
       const currentSession = await SessionManager.getSession(session.user.id);
       
-      // Only allow telegram command if they're at the right stage
       if (!currentSession || currentSession.stage < SessionStage.TELEGRAM_REDIRECT) {
         return NextResponse.json({
-          message: 'ERROR: MUST COMPLETE PREVIOUS STEPS FIRST'
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
         });
       }
 
@@ -502,7 +346,7 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase() === 'skip telegram') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
       
@@ -510,22 +354,7 @@ ACQUISITION STATUS UPDATED:
       await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
       
       return NextResponse.json({
-        message: `[TELEGRAM SYNC BYPASSED]
-=============================
-BYPASS AUTHORIZED
-SKIPPING TELEGRAM VERIFICATION...
-
-ACQUISITION STATUS UPDATED:
--------------------------
-1. MANDATES [COMPLETE]
-2. TELEGRAM SYNC [BYPASSED]
-3. VERIFICATION CODE [UNLOCKED]
-   >TYPE "verify" TO PROCEED
-   >TYPE "skip verify" TO BYPASS
-4. WALLET SUBMISSION [LOCKED]
-5. REFERENCE CODE [LOCKED]
-
->PROCEED TO NEXT STEP`,
+        message: SUCCESS_MESSAGES.TELEGRAM_SYNC_BYPASSED,
         commandComplete: true,
         shouldAutoScroll: true
       });
@@ -535,7 +364,7 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase() === 'verify') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
 
@@ -543,13 +372,13 @@ ACQUISITION STATUS UPDATED:
       
       if (!currentSession || currentSession.stage < SessionStage.TELEGRAM_CODE) {
         return NextResponse.json({
-          message: 'ERROR: MUST COMPLETE PREVIOUS STEPS FIRST'
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
         });
       }
 
       if (currentSession.stage > SessionStage.TELEGRAM_CODE) {
         return NextResponse.json({
-          message: 'ERROR: VERIFICATION PHASE ALREADY COMPLETED'
+          message: ERROR_MESSAGES.VERIFICATION_PHASE_ALREADY_COMPLETED
         });
       }
 
@@ -563,7 +392,7 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase() === 'skip verify') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
       await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
@@ -593,7 +422,7 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase() === 'wallet') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
 
@@ -601,13 +430,13 @@ ACQUISITION STATUS UPDATED:
       
       if (!currentSession || currentSession.stage < SessionStage.WALLET_SUBMIT) {
         return NextResponse.json({
-          message: 'ERROR: MUST COMPLETE PREVIOUS STEPS FIRST'
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
         });
       }
 
       if (currentSession.stage > SessionStage.WALLET_SUBMIT) {
         return NextResponse.json({
-          message: 'ERROR: WALLET PHASE ALREADY COMPLETED'
+          message: ERROR_MESSAGES.WALLET_PHASE_ALREADY_COMPLETED
         });
       }
 
@@ -621,7 +450,7 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase() === 'skip wallet') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
       await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
@@ -651,7 +480,7 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase() === 'reference') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
 
@@ -659,13 +488,13 @@ ACQUISITION STATUS UPDATED:
       
       if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
         return NextResponse.json({
-          message: 'ERROR: MUST COMPLETE PREVIOUS STEPS FIRST'
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
         });
       }
 
       if (currentSession.stage > SessionStage.REFERENCE_CODE) {
         return NextResponse.json({
-          message: 'ERROR: REFERENCE PHASE ALREADY COMPLETED'
+          message: ERROR_MESSAGES.REFERENCE_PHASE_ALREADY_COMPLETED
         });
       }
 
@@ -676,9 +505,10 @@ ACQUISITION STATUS UPDATED:
 
     // Handle generate code command
     if (message.toLowerCase() === 'generate code') {
-      const session = await getServerSession(authOptions);
-      if (!session?.user) {
-        return NextResponse.json({ message: 'Must be authenticated to generate code' });
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.AUTHENTICATION_REQUIRED
+        });
       }
 
       try {
@@ -687,60 +517,29 @@ ACQUISITION STATUS UPDATED:
         // Check if user already has a code
         const existingCode = await db.prepare(
           'SELECT code FROM referral_codes WHERE twitter_id = ?'
-        ).get(session.user.id) as ReferralCode | undefined;
+        ).get(session.user.id) as Pick<ReferralCode, 'code'> | undefined;
 
         if (existingCode) {
-          return NextResponse.json({ 
-            message: `[REFERENCE CODE EXISTS]
-=============================
-YOUR REFERENCE CODE: ${existingCode.code}
-
-[ACQUISITION PROTOCOL COMPLETE]
-==============================
-ALL STEPS VERIFIED
-SYSTEM ACCESS GRANTED
-
->INITIALIZATION COMPLETE
->AWAITING FURTHER INSTRUCTIONS...`,
-            commandComplete: true,
-            shouldAutoScroll: true
+          return NextResponse.json({
+            message: SUCCESS_MESSAGES.REFERENCE_CODE_EXISTS(existingCode.code)
           });
         }
 
-        // Generate and store new code
-        const referralCode = generateReferralCode(session.user.id, session.user.name);
-        
-        await db.prepare(
-          `INSERT INTO referral_codes (twitter_id, twitter_name, code, used_count) 
-           VALUES (?, ?, ?, 0)`
-        ).run(
+        // Generate new code
+        const referralCode = await generateReferralCode(
           session.user.id,
-          session.user.name,
-          referralCode
+          session.user.name || 'unknown'
         );
-        
-        // Update session stage to complete
-        await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
-        
-        return NextResponse.json({ 
-          message: `[REFERENCE CODE GENERATED]
-=============================
-YOUR REFERENCE CODE: ${referralCode}
 
-[ACQUISITION PROTOCOL COMPLETE]
-==============================
-ALL STEPS VERIFIED
-SYSTEM ACCESS GRANTED
-
->INITIALIZATION COMPLETE
->AWAITING FURTHER INSTRUCTIONS...`,
+        return NextResponse.json({
+          message: SUCCESS_MESSAGES.REFERENCE_CODE_GENERATED(referralCode),
           commandComplete: true,
           shouldAutoScroll: true
         });
       } catch (error) {
-        console.error('Error generating reference code:', error);
+        console.error('Error generating code:', error);
         return NextResponse.json({
-          message: 'ERROR: FAILED TO GENERATE REFERENCE CODE\nPLEASE TRY AGAIN'
+          message: ERROR_MESSAGES.GENERATE_CODE_FAILED
         });
       }
     }
@@ -756,7 +555,7 @@ SYSTEM ACCESS GRANTED
 
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
 
@@ -773,7 +572,7 @@ SYSTEM ACCESS GRANTED
 
         if (!referralCode) {
           return NextResponse.json({
-            message: 'ERROR: INVALID REFERENCE CODE\nPLEASE TRY AGAIN'
+            message: ERROR_MESSAGES.INVALID_REFERENCE_CODE
           });
         }
 
@@ -786,7 +585,7 @@ SYSTEM ACCESS GRANTED
 
         if (existingUse) {
           return NextResponse.json({
-            message: 'ERROR: YOU HAVE ALREADY USED A REFERENCE CODE'
+            message: ERROR_MESSAGES.YOU_HAVE_ALREADY_USED_A_REFERENCE_CODE
           });
         }
 
@@ -834,7 +633,7 @@ SYSTEM ACCESS GRANTED
       } catch (error) {
         console.error('Error submitting code:', error);
         return NextResponse.json({
-          message: 'ERROR: CODE SUBMISSION FAILED\nPLEASE TRY AGAIN'
+          message: ERROR_MESSAGES.CODE_SUBMISSION_FAILED
         });
       }
     }
@@ -843,7 +642,7 @@ SYSTEM ACCESS GRANTED
     if (message.toLowerCase() === 'skip reference') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
       await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
@@ -869,27 +668,12 @@ SYSTEM ACCESS GRANTED
     if (message.toLowerCase() === 'join telegram') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
       await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
       return NextResponse.json({
-        message: `[TELEGRAM JOIN COMPLETE]
-=============================
-TELEGRAM GROUP JOINED
-SYNC VERIFIED
-
-ACQUISITION STATUS UPDATED:
--------------------------
-1. MANDATES [COMPLETE]
-2. TELEGRAM SYNC [COMPLETE]
-3. VERIFICATION CODE [UNLOCKED]
-   >TYPE "verify" TO PROCEED
-   >TYPE "skip verify" TO BYPASS
-4. WALLET SUBMISSION [LOCKED]
-5. REFERENCE CODE [LOCKED]
-
->PROCEED TO NEXT STEP`,
+        message: TELEGRAM_MESSAGE,
         commandComplete: true,
         shouldAutoScroll: true
       });
@@ -899,28 +683,12 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase().startsWith('verify ')) {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
-      // Add your code verification logic here
       await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
       return NextResponse.json({
-        message: `[VERIFICATION COMPLETE]
-=============================
-CODE ACCEPTED
-VERIFICATION SUCCESSFUL
-
-ACQUISITION STATUS UPDATED:
--------------------------
-1. MANDATES [COMPLETE]
-2. TELEGRAM SYNC [COMPLETE]
-3. VERIFICATION CODE [COMPLETE]
-4. WALLET SUBMISSION [UNLOCKED]
-   >TYPE "wallet" TO PROCEED
-   >TYPE "skip wallet" TO BYPASS
-5. REFERENCE CODE [LOCKED]
-
->PROCEED TO NEXT STEP`,
+        message: VERIFICATION_MESSAGE,
         commandComplete: true,
         shouldAutoScroll: true
       });
@@ -930,28 +698,12 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase().startsWith('wallet ')) {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
-      // Add your wallet validation logic here
       await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
       return NextResponse.json({
-        message: `[WALLET SUBMISSION COMPLETE]
-=============================
-ADDRESS RECORDED
-SUBMISSION VERIFIED
-
-ACQUISITION STATUS UPDATED:
--------------------------
-1. MANDATES [COMPLETE]
-2. TELEGRAM SYNC [COMPLETE]
-3. VERIFICATION CODE [COMPLETE]
-4. WALLET SUBMISSION [COMPLETE]
-5. REFERENCE CODE [UNLOCKED]
-   >TYPE "reference" TO PROCEED
-   >TYPE "skip reference" TO BYPASS
-
->PROCEED TO NEXT STEP`,
+        message: WALLET_MESSAGE,
         commandComplete: true,
         shouldAutoScroll: true
       });
@@ -961,45 +713,29 @@ ACQUISITION STATUS UPDATED:
     if (message.toLowerCase() === 'show referral code') {
       if (!session) {
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
 
       try {
         const db = await initDb();
-        
-        // Check if user has a code
         const existingCode = await db.prepare(
           'SELECT code FROM referral_codes WHERE twitter_id = ?'
-        ).get(
-          session.user.id
-        ) as Pick<ReferralCode, 'code'> | undefined;
+        ).get(session.user.id) as Pick<ReferralCode, 'code'> | undefined;
 
         if (!existingCode) {
           return NextResponse.json({
-            message: `[NO REFERENCE CODE FOUND]
-=============================
-You haven't generated a reference code yet.
-
->TYPE "generate code" TO CREATE ONE
->TYPE "submit code <CODE>" TO SUBMIT A DIFFERENT CODE
->TYPE "skip reference" TO BYPASS`
+            message: RESPONSE_MESSAGES.NO_REFERENCE_CODE
           });
         }
 
         return NextResponse.json({
-          message: `[REFERENCE CODE RETRIEVED]
-=============================
-YOUR REFERENCE CODE: ${existingCode.code}
-
->SHARE THIS CODE WITH OTHERS
->USE "submit code <CODE>" TO SUBMIT A DIFFERENT CODE
->USE "skip reference" TO BYPASS`
+          message: RESPONSE_MESSAGES.REFERENCE_CODE_RETRIEVED(existingCode.code)
         });
       } catch (error) {
         console.error('Error retrieving code:', error);
         return NextResponse.json({
-          message: 'ERROR: FAILED TO RETRIEVE REFERENCE CODE\nPLEASE TRY AGAIN'
+          message: ERROR_MESSAGES.REFERENCE_FAILED
         });
       }
     }
@@ -1009,7 +745,7 @@ YOUR REFERENCE CODE: ${existingCode.code}
       const currentSession = await SessionManager.getSession(session.user.id);
       if (!currentSession) {
         return NextResponse.json({
-          message: 'ERROR: SESSION NOT FOUND'
+          message: ERROR_MESSAGES.SESSION_NOT_FOUND
         });
       }
 
@@ -1025,7 +761,7 @@ YOUR REFERENCE CODE: ${existingCode.code}
     }
 
     return NextResponse.json({
-      message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
+      message: ERROR_MESSAGES.SESSION_REQUIRED
     });
 
   } catch (error) {

@@ -58,6 +58,9 @@ const migrations: Migration[] = [
           reference_code_message_shown BOOLEAN DEFAULT FALSE,
           protocol_complete_message_shown BOOLEAN DEFAULT FALSE
         );
+
+        CREATE INDEX IF NOT EXISTS idx_referral_codes_twitter_id 
+        ON referral_codes(twitter_id);
       `);
     },
     down: async (db: Database) => {

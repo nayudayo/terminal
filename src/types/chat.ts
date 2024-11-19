@@ -14,8 +14,9 @@ export interface Message {
 export interface ChatState {
   messages: Message[];
   completionStatus: CompletionStatus;
-  sessionStage?: SessionStage;
+  sessionStage: SessionStage;
   timestamp: number;
+  lastResponse?: string;
 }
 
 export interface CompletionStatus {
@@ -34,10 +35,18 @@ export interface CompletionStatus {
 
 export interface ChatResponse {
   message: string;
-  action?: 'CONNECT_TWITTER';
+  action?: 'INTRO_MESSAGE' | 'CONNECT_TWITTER' | 'SHOW_MANDATES' | 'SHOW_TELEGRAM' | 
+          'SHOW_VERIFICATION' | 'SHOW_WALLET' | 'SHOW_REFERENCE';
   commandComplete?: boolean;
   shouldAutoScroll?: boolean;
   dispatchEvent?: string;
+  newStage?: SessionStage;
+  followComplete?: boolean;
+  likeComplete?: boolean;
+  telegramComplete?: boolean;
+  verificationComplete?: boolean;
+  walletComplete?: boolean;
+  referenceComplete?: boolean;
 }
 
 export interface ChatMessage {

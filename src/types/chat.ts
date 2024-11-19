@@ -47,10 +47,17 @@ export interface ChatResponse {
   verificationComplete?: boolean;
   walletComplete?: boolean;
   referenceComplete?: boolean;
+  error?: string;
 }
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+}
+
+export interface AIResponse {
+  message: string;
+  shouldAutoScroll?: boolean;
+  error?: string;
 }

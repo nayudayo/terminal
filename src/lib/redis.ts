@@ -18,6 +18,14 @@ export const getRedisClient = () => {
       enableReadyCheck: true,
       connectTimeout: 10000,
       disconnectTimeout: 2000,
+      enableOfflineQueue: true,
+      reconnectOnError: function(err) {
+        const targetError = 'READONLY';
+        if (err.message.includes(targetError)) {
+          return true;
+        }
+        return false;
+      },
     });
 
     redis.on('error', (err) => {
@@ -26,6 +34,15 @@ export const getRedisClient = () => {
 
     redis.on('connect', () => {
       console.log('Redis client connected');
+    });
+
+    redis.on('ready', async () => {
+      try {
+        await redis!.ping();
+        console.log('Redis connection healthy');
+      } catch (error) {
+        console.error('Redis health check failed:', error);
+      }
     });
   }
   return redis;
@@ -96,5 +113,17 @@ export async function setChatState(userId: string, state: ChatState): Promise<vo
   } catch (error) {
     console.error('Redis set chat state error:', error);
     throw error;
+  }
+}
+
+// Add health check function
+export async function checkRedisHealth(): Promise<boolean> {
+  try {
+    const client = getRedisClient();
+    await client.ping();
+    return true;
+  } catch (error) {
+    console.error('Redis health check failed:', error);
+    return false;
   }
 } 

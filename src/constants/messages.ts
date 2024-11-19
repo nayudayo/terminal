@@ -171,40 +171,35 @@ export const WALLET_MESSAGE = `
 STEP [4/5]: WALLET SUBMISSION
 ---------------------------
 SUBMISSION REQUIREMENTS:
-1. ENTER BOTH WALLET ADDRESSES
-   >TYPE "wallet <solana-address> <near-address>" TO PROCEED
-   >TYPE "skip wallet" TO BYPASS
+1. ACTIVE WALLETS REQUIRED
+   - Must have transaction history
+   - Both wallets must be valid
+   - Both addresses required
 
-SUPPORTED WALLET FORMATS:
------------------------
-1. SOLANA WALLET (REQUIRED)
-   - Base58-encoded public key (32-44 chars)
-   - Alphanumeric characters only
+SUPPORTED FORMATS:
+---------------
+1. SOLANA WALLET
+   - Base58-encoded public key
+   - Must have transactions
    Example: 7v91N7iZ9mNicL8WfG6cgSCKyRXydQjLh6UYBWwm6y1Q
 
-2. NEAR WALLET (REQUIRED)
+2. NEAR WALLET
    - Format: username.near or username.testnet
-   - Username: 2-64 characters
-   - Allowed: lowercase letters, numbers, hyphens
+   - Must be active account
    Examples: 
    - alice.near
    - bob.testnet
-   - my-wallet-123.near
 
-VALIDATION RULES:
---------------
-- Both wallets must be submitted together
-- No spaces in wallet addresses
-- Case sensitive
-- Exact format required
-- No private keys
+COMMAND SYNTAX:
+------------
+>wallet <solana-address> <near-address>
 
-EXAMPLE SUBMISSION:
-----------------
->wallet 7v91N7iZ9mNicL8WfG6cgSCKyRXydQjLh6UYBWwm6y1Q alice.near
+BYPASS OPTION:
+------------
+>TYPE "skip wallet" TO BYPASS
 
 WARNING: EXACT SYNTAX REQUIRED
-AWAITING USER INPUT...
+AWAITING WALLET SUBMISSION...
 `;
 
 export const REFERENCE_MESSAGE = `
@@ -292,25 +287,30 @@ export const ERROR_TWITTER_CONNECT_FIRST = 'ERROR: X NETWORK CONNECTION REQUIRED
 export const ERROR_INVALID_REFERENCE = 'ERROR: INVALID REFERENCE CODE\nPLEASE TRY AGAIN';
 export const ERROR_REFERENCE_ALREADY_USED = 'ERROR: YOU HAVE ALREADY USED A REFERENCE CODE';
 
+
 // Add these new wallet-related messages
 export const WALLET_ERROR_MESSAGES = {
   SOLANA: {
     LENGTH: 'Solana address must be between 32-44 characters long',
     CHARACTERS: 'Solana address can only contain base58 characters (alphanumeric, no 0, O, I, l)',
-    FORMAT: 'Invalid Solana wallet format. Example: 7v91N7iZ9mNicL8WfG6cgSCKyRXydQjLh6UYBWwm6y1Q'
+    FORMAT: 'Invalid Solana wallet format. Example: 7v91N7iZ9mNicL8WfG6cgSCKyRXydQjLh6UYBWwm6y1Q',
+    NO_TRANSACTIONS: 'No transactions found. Please use a wallet with transaction history.'
   },
   NEAR: {
     ENDING: 'NEAR address must end with .near or .testnet',
     LENGTH: 'NEAR username must be between 2-64 characters',
     CHARACTERS: 'NEAR username can only contain lowercase letters, numbers, and hyphens',
     HYPHEN: 'NEAR username cannot start or end with a hyphen, and cannot have consecutive hyphens',
-    FORMAT: 'Invalid NEAR wallet format. Examples:\n- alice.near\n- bob.testnet\n- my-wallet-123.near'
+    FORMAT: 'Invalid NEAR wallet format. Examples:\n- alice.near\n- bob.testnet\n- my-wallet-123.near',
+    NO_TRANSACTIONS: 'No transactions found. Please use a wallet with transaction history.',
+    NOT_FOUND: 'NEAR account not found or invalid'
   },
   GENERAL: {
-    INVALID: 'Please enter a valid Solana or NEAR wallet address',
+    INVALID: 'Please enter valid Solana and NEAR wallet addresses',
     RATE_LIMIT: 'Too many attempts. Please try again in a few minutes.',
-    NETWORK_ERROR: 'Network error. Please try again.',
-    VERIFICATION_FAILED: 'Wallet verification failed. Please check the address and try again.'
+    NETWORK_ERROR: 'Network error while verifying wallets. Please try again.',
+    VERIFICATION_FAILED: 'Wallet verification failed. Please ensure both wallets have transaction history.',
+    SYNTAX: 'Invalid syntax. Use: wallet <solana-address> <near-address>'
   }
 };
 
@@ -356,7 +356,8 @@ export const ERROR_MESSAGES = {
   CODE_SUBMISSION_FAILED: 'ERROR: CODE SUBMISSION FAILED\nPLEASE TRY AGAIN',
   INVALID_CODE_FORMAT: 'Invalid code format. Please use: submit code <CODE>',
   AUTHENTICATION_REQUIRED: 'Must be authenticated to generate code',
-  GENERATE_CODE_FAILED: 'ERROR: FAILED TO GENERATE REFERENCE CODE\nPLEASE TRY AGAIN'
+  GENERATE_CODE_FAILED: 'ERROR: FAILED TO GENERATE REFERENCE CODE\nPLEASE TRY AGAIN',
+  TELEGRAM_PHASE_ALREADY_COMPLETED: 'Telegram protocols have been completed.'
 };
 
 // Add success messages
@@ -583,4 +584,82 @@ SYSTEM ACCESS GRANTED
 
 >INITIALIZATION COMPLETE
 >AWAITING FURTHER INSTRUCTIONS...`
+};
+
+// Add these new messages to the existing file
+export const PROTOCOL_MESSAGES = {
+  LOAD_STAGE: {
+    AUTHENTICATED: AUTHENTICATED_MESSAGE, // Use existing message
+    ERROR: {
+      SESSION_NOT_FOUND: 'ERROR: SESSION NOT FOUND',
+      LOADING: 'Error loading stage:'
+    }
+  },
+  
+  BUTTON_SEQUENCE: {
+    ENGAGED: '[BUTTON ENGAGED]\nINITIATING SEQUENCE...',
+    SIGNAL_DETECTED: '[SIGNAL DETECTED]\nFREQUENCY ANOMALY FOUND\nINITIATING DIGITAL BRIDGE PROTOCOL...\n\n>AWAITING X NETWORK SYNCHRONIZATION\n>TYPE "connect x account" TO PROCEED\n>WARNING: EXACT SYNTAX REQUIRED\n\nCONNECTION STATUS: PENDING...'
+  },
+
+  TWITTER_AUTH: {
+    INITIATING: '[INITIATING X NETWORK SYNC]\nRedirecting to authorization...',
+    MUST_AUTH: 'Must be authenticated to generate code'
+  },
+
+  WALLET_VALIDATION: {
+    COMPLETE: `[WALLET SUBMISSION COMPLETE]
+=============================
+ADDRESS RECORDED
+SUBMISSION VERIFIED
+
+ACQUISITION STATUS UPDATED:
+-------------------------
+1. MANDATES [COMPLETE]
+2. TELEGRAM SYNC [COMPLETE]
+3. VERIFICATION CODE [COMPLETE]
+4. WALLET SUBMISSION [COMPLETE]
+5. REFERENCE CODE [UNLOCKED]
+   >TYPE "reference" TO PROCEED
+   >TYPE "skip reference" TO BYPASS
+
+>PROCEED TO NEXT STEP`
+  },
+
+  VERIFICATION: {
+    COMPLETE: `[VERIFICATION COMPLETE]
+=============================
+CODE ACCEPTED
+VERIFICATION SUCCESSFUL
+
+ACQUISITION STATUS UPDATED:
+-------------------------
+1. MANDATES [COMPLETE]
+2. TELEGRAM SYNC [COMPLETE]
+3. VERIFICATION CODE [COMPLETE]
+4. WALLET SUBMISSION [UNLOCKED]
+   >TYPE "wallet" TO PROCEED
+   >TYPE "skip wallet" TO BYPASS
+5. REFERENCE CODE [LOCKED]
+
+>PROCEED TO NEXT STEP`
+  },
+
+  TELEGRAM: {
+    JOIN_COMPLETE: `[TELEGRAM JOIN COMPLETE]
+=============================
+TELEGRAM GROUP JOINED
+SYNC VERIFIED
+
+ACQUISITION STATUS UPDATED:
+-------------------------
+1. MANDATES [COMPLETE]
+2. TELEGRAM SYNC [COMPLETE]
+3. VERIFICATION CODE [UNLOCKED]
+   >TYPE "verify" TO PROCEED
+   >TYPE "skip verify" TO BYPASS
+4. WALLET SUBMISSION [LOCKED]
+5. REFERENCE CODE [LOCKED]
+
+>PROCEED TO NEXT STEP`
+  }
 };

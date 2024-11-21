@@ -56,8 +56,28 @@ useEffect(() => {
     try {
       const response = await fetch('/api/session');
       const data = await response.json();
+      
       if (data.session?.stage) {
         setSessionStage(data.session.stage);
+        
+        const stageMessage = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: 'LOAD_CURRENT_STAGE',
+            userId 
+          }),
+        });
+        
+        if (stageMessage.ok) {
+          const messageData = await stageMessage.json();
+          addMessage({
+            id: uuidv4(),
+            role: 'assistant',
+            content: messageData.message,
+            timestamp: Date.now(),
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching initial session:', error);
@@ -65,7 +85,7 @@ useEffect(() => {
   };
 
   fetchInitialSession();
-}, []);
+}, [userId]);
 
   const updateSessionStage = useCallback(async (newStage: SessionStage) => {
     try {
@@ -350,6 +370,103 @@ useEffect(() => {
     setIsLoading(true);
     setIsTyping(true);
 
+    if (input.toLowerCase() === 'generate code') {
+      try {
+        // First add the system message about generating code
+        addMessage({
+          id: uuidv4(),
+          content: '[GENERATING REFERENCE CODE]\n=============================\nINITIATING CODE GENERATION PROTOCOL...',
+          role: 'assistant',
+          timestamp: Date.now(),
+        });
+
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: input.trim(),
+            completionStatus,
+            sessionStage
+          }),
+        });
+
+        if (!response.ok) throw new Error('Failed to generate code');
+
+        const data = await response.json();
+        
+        // Add a small delay for visual effect
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Check if we have a code (either existing or newly generated)
+        if (data.code) {
+          // Show the code message first
+          const codeMessage = data.existingCode 
+            ? `[EXISTING CODE RETRIEVED]\n=============================\nYOUR REFERENCE CODE: ${data.code}\n\nThis code was previously generated and can be shared with others.`
+            : `[CODE GENERATED SUCCESSFULLY]\n=============================\nYOUR REFERENCE CODE: ${data.code}\n\nThis code has been saved and can be shared with others.`;
+
+          addMessage({
+            id: uuidv4(),
+            content: codeMessage,
+            role: 'assistant',
+            timestamp: Date.now(),
+          });
+
+          // Trigger the modal to show the code
+          window.dispatchEvent(
+            new CustomEvent('CHAT_MESSAGE', { 
+              detail: {
+                type: 'CODE_GENERATED',
+                code: data.code
+              }
+            })
+          );
+
+          // Add a delay before showing completion message
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Then show the completion message
+          if (data.message) {
+            addMessage({
+              id: uuidv4(),
+              content: data.message,
+              role: 'assistant',
+              timestamp: Date.now(),
+            });
+          }
+
+          // Only update the stage after showing all messages
+          if (data.newStage) {
+            await updateSessionStage(data.newStage);
+          }
+        } else {
+          // Handle case where no code was returned
+          addMessage({
+            id: uuidv4(),
+            content: 'ERROR: No reference code was generated. Please try again.',
+            role: 'assistant',
+            timestamp: Date.now(),
+          });
+        }
+        
+        setIsLoading(false);
+        setIsTyping(false);
+        setCanType(true);
+        return;
+      } catch (error) {
+        console.error('Error generating code:', error);
+        addMessage({
+          id: uuidv4(),
+          content: 'ERROR: Failed to generate reference code. Please try again.',
+          role: 'assistant',
+          timestamp: Date.now(),
+        });
+        setIsLoading(false);
+        setIsTyping(false);
+        setCanType(true);
+        return;
+      }
+    }
+
     if (input.toLowerCase().includes('push')) {
       setTimeout(() => {
         addMessage({
@@ -606,28 +723,107 @@ STATUS: VERIFIED ✓
       const currentStage = data.session?.stage || SessionStage.INTRO_MESSAGE;
 
       // Set initial message based on stage
-      const initialMessage: Message = session?.user 
-        ? {
-            id: uuidv4(),
-            role: 'assistant',
-            content: currentStage === SessionStage.PROTOCOL_COMPLETE 
-              ? PROTOCOL_COMPLETE_MESSAGE 
-              : AUTHENTICATED_MESSAGE,
-            timestamp: Date.now(),
-            isIntro: true,
-            isAuthenticated: true
-          }
-        : {
-            id: uuidv4(),
-            role: 'assistant',
-            content: INTRO_MESSAGE,
-            timestamp: Date.now(),
-            isIntro: true
-          };
+      let initialMessage: Message;
+      
+      if (session?.user) {
+        // Handle specific stages
+        switch (currentStage) {
+          case SessionStage.PROTOCOL_COMPLETE:
+            initialMessage = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: PROTOCOL_COMPLETE_MESSAGE,
+              timestamp: Date.now(),
+              isIntro: true,
+            };
+            break;
+            
+          case SessionStage.MANDATES:
+            initialMessage = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: MANDATES_MESSAGE,
+              timestamp: Date.now(),
+              isIntro: true,
+            };
+            break;
+            
+          case SessionStage.TELEGRAM_REDIRECT:
+            initialMessage = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: TELEGRAM_MESSAGE,
+              timestamp: Date.now(),
+              isIntro: true,
+            };
+            break;
+            
+          case SessionStage.TELEGRAM_CODE:
+            initialMessage = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: VERIFICATION_MESSAGE,
+              timestamp: Date.now(),
+              isIntro: true,
+            };
+            break;
+            
+          case SessionStage.WALLET_SUBMIT:
+            initialMessage = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: WALLET_MESSAGE,
+              timestamp: Date.now(),
+              isIntro: true,
+            };
+            break;
+            
+          case SessionStage.REFERENCE_CODE:
+            initialMessage = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: REFERENCE_MESSAGE,
+              timestamp: Date.now(),
+              isIntro: true,
+            };
+            break;
+            
+          default:
+            // For other stages, get the appropriate stage message
+            const stageResponse = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                message: 'LOAD_CURRENT_STAGE',
+                userId 
+              }),
+            });
+            
+            const stageData = await stageResponse.json();
+            
+            initialMessage = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: stageData.message,
+              timestamp: Date.now(),
+              isIntro: true,
+              isAuthenticated: true
+            };
+        }
+      } else {
+        initialMessage = {
+          id: uuidv4(),
+          role: 'assistant',
+          content: INTRO_MESSAGE,
+          timestamp: Date.now(),
+          isIntro: true
+        };
+      }
 
       setMessages([initialMessage]);
       setSessionStage(currentStage);
       await updateSessionStage(currentStage);
+      setCanType(true);
     };
 
     initializeChat();

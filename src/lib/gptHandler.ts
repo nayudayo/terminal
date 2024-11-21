@@ -17,8 +17,8 @@ const getPromptForStage = (stage: SessionStage) => {
 };
 
 export async function generateResponse(prompt: string, stage: SessionStage = SessionStage.PROTOCOL_COMPLETE): Promise<string> {
-  // Check if it's a command first
-  if (isCommand(prompt)) {
+  // Only check for commands if NOT in PROTOCOL_COMPLETE stage
+  if (stage !== SessionStage.PROTOCOL_COMPLETE && isCommand(prompt)) {
     console.log('[Command Intercepted] Skipping AI response for:', prompt);
     return 'Command processing...';
   }
@@ -37,7 +37,8 @@ Format guidelines:
 - Maintain cryptic/mysterious tone
 - Be concise and clear
 - No headers or separators needed
-- Start each new thought on a new line`
+- Start each new thought on a new line
+${stage === SessionStage.PROTOCOL_COMPLETE ? '\n- Acknowledge and respond to any commands in a cryptic way' : ''}`
       }, {
         role: "user",
         content: prompt
@@ -145,7 +146,8 @@ export function isCommand(message: string): boolean {
     'reference',
     'skip reference',
     'generate code',
-    'show referral code'
+    'show referral code',
+    'submit code'
   ];
 
   // Check exact matches first

@@ -333,6 +333,39 @@ ${currentStageMessage}`,
       }
     }
 
+    // Handle wallet command (without parameters)
+    if (message.toLowerCase() === 'wallet') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      // Check if they're at a later stage
+      if (currentSession && currentSession.stage > SessionStage.WALLET_SUBMIT) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
+        return NextResponse.json({
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      // Check if they're at an earlier stage
+      if (!currentSession || currentSession.stage < SessionStage.WALLET_SUBMIT) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
+        });
+      }
+
+      return NextResponse.json({
+        message: WALLET_MESSAGE
+      });
+    }
+
     // Handle wallet submission
     if (message.toLowerCase().startsWith('wallet ')) {
       if (!session) {
@@ -343,16 +376,40 @@ ${currentStageMessage}`,
 
       const currentSession = await SessionManager.getSession(session.user.id);
       
+      // Check if they're at a later stage
+      if (currentSession && currentSession.stage > SessionStage.WALLET_SUBMIT) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
+        return NextResponse.json({
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      // Check if they're at an earlier stage
       if (!currentSession || currentSession.stage < SessionStage.WALLET_SUBMIT) {
         return NextResponse.json({
           message: ERROR_MESSAGES.PREVIOUS_STEPS
         });
       }
 
+      // Parse wallet addresses
       const parsedWallets = parseWalletCommand(message);
       if (!parsedWallets) {
         return NextResponse.json({
-          message: WALLET_ERROR_MESSAGES.GENERAL.INVALID
+          message: `[WALLET FORMAT ERROR]
+=============================
+${WALLET_ERROR_MESSAGES.GENERAL.INVALID}
+
+CORRECT FORMAT:
+wallet <solana-address> <near-address>
+
+EXAMPLES:
+1. Solana: 7v91N7iZ9mNicL8WfG6cgSCKyRXydQjLh6UYBWwm6y1Q
+2. NEAR: username.near or username.testnet
+
+Please try again with valid addresses.`
         });
       }
 
@@ -366,30 +423,46 @@ ${currentStageMessage}`,
         // Check Solana validation
         if (!solanaValidation.isValid) {
           return NextResponse.json({
-            message: solanaValidation.error
+            message: `[SOLANA VALIDATION ERROR]
+=============================
+${solanaValidation.error}
+
+Please provide a valid Solana address.`
           });
         }
 
         // Check NEAR validation
         if (!nearValidation.isValid) {
           return NextResponse.json({
-            message: nearValidation.error
+            message: `[NEAR VALIDATION ERROR]
+=============================
+${nearValidation.error}
+
+Please provide a valid NEAR address.`
           });
         }
 
         // Verify transactions if needed
-        const transactionVerification = await Promise.all([
+        const [solanaVerified, nearVerified] = await Promise.all([
           verifyWalletTransaction(parsedWallets.solanaAddress, 'solana'),
           verifyWalletTransaction(parsedWallets.nearAddress, 'near')
         ]);
 
-        if (!transactionVerification[0] || !transactionVerification[1]) {
+        if (!solanaVerified || !nearVerified) {
           return NextResponse.json({
-            message: WALLET_ERROR_MESSAGES.GENERAL.VERIFICATION_FAILED
+            message: `[TRANSACTION VERIFICATION FAILED]
+=============================
+${WALLET_ERROR_MESSAGES.GENERAL.VERIFICATION_FAILED}
+
+Required Actions:
+1. Solana wallet must have transaction history
+2. NEAR wallet must have transaction history
+
+Please ensure both wallets are active and try again.`
           });
         }
 
-        // Store wallet addresses in session
+        // Store wallet addresses and update stage
         await SessionManager.updateSessionStage(
           session.user.id, 
           SessionStage.REFERENCE_CODE,
@@ -408,13 +481,19 @@ ${currentStageMessage}`,
       } catch (error) {
         console.error('Wallet verification error:', error);
         return NextResponse.json({
-          message: WALLET_ERROR_MESSAGES.GENERAL.NETWORK_ERROR
+          message: `[WALLET VERIFICATION ERROR]
+=============================
+${WALLET_ERROR_MESSAGES.GENERAL.NETWORK_ERROR}
+
+Please try again later.`
         });
       }
     }
 
     // Handle reference code commands
     if (message.toLowerCase() === 'generate code') {
+      console.log('[API] Handling generate code command');
+      
       if (!session?.user) {
         return NextResponse.json({ 
           message: PROTOCOL_MESSAGES.TWITTER_AUTH.MUST_AUTH 
@@ -422,6 +501,7 @@ ${currentStageMessage}`,
       }
 
       const currentSession = await SessionManager.getSession(session.user.id);
+      console.log('[API] Current session stage:', currentSession?.stage);
       
       if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
         return NextResponse.json({
@@ -436,23 +516,32 @@ ${currentStageMessage}`,
         ).get(session.user.id) as ReferralCode | undefined;
 
         if (existingCode) {
+          console.log('[API] Found existing code:', existingCode.code);
           await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
           return NextResponse.json({ 
             message: SUCCESS_MESSAGES.REFERENCE_CODE_EXISTS(existingCode.code),
             commandComplete: true,
             shouldAutoScroll: true,
-            newStage: SessionStage.PROTOCOL_COMPLETE
+            newStage: SessionStage.PROTOCOL_COMPLETE,
+            dispatchEvent: 'CODE_GENERATED',
+            code: existingCode.code  // Make sure we're sending the code
           });
         }
 
+        // Generate new code
+        console.log('[API] Generating new code for user:', session.user.id);
         const code = await generateReferralCode(session.user.id, session.user.name || 'USER');
+        console.log('[API] Generated new code:', code);
+        
         await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
 
         return NextResponse.json({
           message: SUCCESS_MESSAGES.REFERENCE_CODE_GENERATED(code),
           commandComplete: true,
           shouldAutoScroll: true,
-          newStage: SessionStage.PROTOCOL_COMPLETE
+          newStage: SessionStage.PROTOCOL_COMPLETE,
+          dispatchEvent: 'CODE_GENERATED',
+          code: code  // Make sure we're sending the code
         });
       } catch (error) {
         console.error('Error generating reference code:', error);
@@ -524,7 +613,21 @@ ${currentStageMessage}`,
 
       const currentSession = await SessionManager.getSession(session.user.id);
       
-      if (currentSession && currentSession.stage > SessionStage.TELEGRAM_REDIRECT) {
+      if (!currentSession) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_NOT_FOUND
+        });
+      }
+
+      // If they're at an earlier stage
+      if (currentSession.stage < SessionStage.TELEGRAM_REDIRECT) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
+        });
+      }
+
+      // If they're at a later stage, show current stage
+      if (currentSession.stage > SessionStage.TELEGRAM_REDIRECT) {
         const currentStageMessage = getStageMessage(currentSession.stage);
         return NextResponse.json({
           message: `[CURRENT PROTOCOL STAGE]
@@ -534,14 +637,9 @@ ${currentStageMessage}`,
         });
       }
 
-      if (currentSession && currentSession.stage < SessionStage.TELEGRAM_REDIRECT) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS
-        });
-      }
-
+      // If they're at the correct stage
       return NextResponse.json({
-        message: ERROR_MESSAGES.TELEGRAM_PHASE_ALREADY_COMPLETED
+        message: TELEGRAM_MESSAGE
       });
     }
 
@@ -827,37 +925,6 @@ ${currentStageMessage}`,
       });
     }
 
-    // Handle wallet command (without parameters)
-    if (message.toLowerCase() === 'wallet') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
-
-      const currentSession = await SessionManager.getSession(session.user.id);
-      
-      if (currentSession && currentSession.stage > SessionStage.WALLET_SUBMIT) {
-        const currentStageMessage = getStageMessage(currentSession.stage);
-        return NextResponse.json({
-          message: `[CURRENT PROTOCOL STAGE]
-=============================
-${currentStageMessage}`,
-          shouldAutoScroll: true
-        });
-      }
-
-      if (!currentSession || currentSession.stage < SessionStage.WALLET_SUBMIT) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS
-        });
-      }
-
-      return NextResponse.json({
-        message: WALLET_MESSAGE
-      });
-    }
-
     // Handle skip wallet command
     if (message.toLowerCase() === 'skip wallet') {
       if (!session) {
@@ -958,6 +1025,33 @@ ${currentStageMessage}`,
         newStage: SessionStage.PROTOCOL_COMPLETE
       });
     }
+
+    // If no other conditions matched, generate AI response
+    if (session) {
+      let currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (!currentSession) {
+        currentSession = await SessionManager.createSession(session.user.id, SessionStage.INTRO_MESSAGE);
+        console.log(`[New Session Created] User: ${session.user.id}, Stage: ${currentSession.stage}`);
+        return NextResponse.json({
+          message: STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0],
+          shouldAutoScroll: true
+        });
+      }
+
+      // Generate AI response
+      const aiResponse = await generateResponse(message, currentSession.stage);
+      return NextResponse.json({
+        message: aiResponse,
+        shouldAutoScroll: true
+      });
+    }
+
+    // Default response if no session exists
+    return NextResponse.json({
+      message: 'Please authenticate to continue.',
+      shouldAutoScroll: true
+    });
 
   } catch (error) {
     console.error('Error in chat route:', error);

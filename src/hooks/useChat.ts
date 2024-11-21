@@ -316,6 +316,22 @@ useEffect(() => {
     }, [userId]);
 
 
+  // Add a message deduplication check
+  const addMessage = useCallback((newMessage: Message) => {
+    setMessages(prev => {
+      // Check if this message already exists (within last 2 seconds)
+      const isDuplicate = prev.some(msg => 
+        msg.content === newMessage.content && 
+        Math.abs(msg.timestamp - newMessage.timestamp) < 2000
+      );
+      
+      if (isDuplicate) {
+        return prev;
+      }
+      return [...prev, newMessage];
+    });
+  }, []);
+
   // Handle submit
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -329,21 +345,21 @@ useEffect(() => {
       timestamp: Date.now(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    addMessage(userMessage);
     setInput('');
     setIsLoading(true);
     setIsTyping(true);
 
     if (input.toLowerCase().includes('push')) {
       setTimeout(() => {
-        setMessages(prev => [...prev, {
+        addMessage({
           id: uuidv4(),
           role: 'assistant',
           content: UP_PUSH_RESPONSE_ART,
           timestamp: Date.now(),
           isIntro: true,
           showButton: true
-        }]);
+        });
         setIsLoading(false);
         setIsTyping(false);
       }, 1000);
@@ -358,12 +374,12 @@ useEffect(() => {
         setShowTelegramFallback(true);
       }, 5000);
 
-      setMessages(prev => [...prev, {
+      addMessage({
         id: uuidv4(),
         role: 'assistant',
         content: TELEGRAM_REDIRECT_MESSAGE,
         timestamp: Date.now(),
-      }]);
+      });
       setIsLoading(false);
       setIsTyping(false);
       return;
@@ -372,12 +388,12 @@ useEffect(() => {
     if (input.toLowerCase().startsWith('wallet ')) {
       const parsedWallets = parseWalletCommand(input);
       if (!parsedWallets) {
-        setMessages(prev => [...prev, {
+        addMessage({
           id: uuidv4(),
           role: 'assistant',
           content: WALLET_ERROR_MESSAGES.GENERAL.INVALID,
           timestamp: Date.now(),
-        }]);
+        });
         setIsLoading(false);
         setIsTyping(false);
         return;
@@ -392,12 +408,12 @@ useEffect(() => {
 
         // Check Solana validation
         if (!solanaValidation.isValid) {
-          setMessages(prev => [...prev, {
+          addMessage({
             id: uuidv4(),
             role: 'assistant',
             content: solanaValidation.error || WALLET_ERROR_MESSAGES.SOLANA.FORMAT,
             timestamp: Date.now(),
-          }]);
+          });
           setIsLoading(false);
           setIsTyping(false);
           return;
@@ -405,12 +421,12 @@ useEffect(() => {
 
         // Check NEAR validation
         if (!nearValidation.isValid) {
-          setMessages(prev => [...prev, {
+          addMessage({
             id: uuidv4(),
             role: 'assistant',
             content: nearValidation.error || WALLET_ERROR_MESSAGES.NEAR.FORMAT,
             timestamp: Date.now(),
-          }]);
+          });
           setIsLoading(false);
           setIsTyping(false);
           return;
@@ -423,7 +439,7 @@ useEffect(() => {
         ]);
 
         if (!solanaVerified || !nearVerified) {
-          setMessages(prev => [...prev, {
+          addMessage({
             id: uuidv4(),
             role: 'assistant',
             content: `[TRANSACTION VERIFICATION FAILED]
@@ -436,7 +452,7 @@ Required:
 
 Please ensure both wallets are active and try again.`,
             timestamp: Date.now(),
-          }]);
+          });
           setIsLoading(false);
           setIsTyping(false);
           return;
@@ -444,7 +460,7 @@ Please ensure both wallets are active and try again.`,
 
         // If valid and verified, proceed with submission
         handleCommandComplete('submit wallet');
-        setMessages(prev => [...prev, {
+        addMessage({
           id: uuidv4(),
           role: 'assistant',
           content: `[WALLET VERIFICATION COMPLETE]
@@ -456,18 +472,18 @@ STATUS: VERIFIED ✓
 [PROCEEDING TO NEXT STEP]
 >Type "help" to see available commands`,
           timestamp: Date.now(),
-        }]);
+        });
         setIsLoading(false);
         setIsTyping(false);
         return;
       } catch (error) {
         console.error('Wallet verification error:', error);
-        setMessages(prev => [...prev, {
+        addMessage({
           id: uuidv4(),
           role: 'assistant',
           content: WALLET_ERROR_MESSAGES.GENERAL.NETWORK_ERROR,
           timestamp: Date.now(),
-        }]);
+        });
         setIsLoading(false);
         setIsTyping(false);
         return;
@@ -498,12 +514,12 @@ STATUS: VERIFIED ✓
           })
         );
         
-        setMessages(prev => [...prev, {
+        addMessage({
           id: uuidv4(),
           content: data.message,
           role: 'assistant',
           timestamp: Date.now(),
-        }]);
+        });
         
         setIsLoading(false);
         setIsTyping(false);
@@ -556,14 +572,14 @@ STATUS: VERIFIED ✓
         timestamp: Date.now(),
       };
 
-      setMessages(prev => [...prev, newMessage]);
+      addMessage(newMessage);
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setIsLoading(false);
       setIsTyping(false);
     }
-  }, [ input, isLoading, canType, handleCommandComplete, completionStatus, sessionStage, updateSessionStage, handleTelegramRedirect, handleTelegramCode, handleWalletSubmit, handleReferenceCode, handleProtocolComplete]);
+  }, [input, isLoading, canType, addMessage, completionStatus, sessionStage, updateSessionStage, handleTelegramRedirect, handleTelegramCode, handleWalletSubmit, handleReferenceCode, handleProtocolComplete, handleCommandComplete]);
 
 
 
@@ -648,12 +664,12 @@ STATUS: VERIFIED ✓
 
           if (isAuthenticated) {
             // If authenticated, show a different message
-            setMessages(prev => [...prev, {
+            addMessage({
               id: uuidv4(),
               role: 'assistant',
               content: '[SYSTEM STATUS: ALREADY AUTHENTICATED]\n=============================\nX NETWORK CONNECTION ALREADY ESTABLISHED\n\n>TYPE "help" TO SEE AVAILABLE COMMANDS',
               timestamp: Date.now()
-            }]);
+            });
             return;
           }
 
@@ -664,12 +680,12 @@ STATUS: VERIFIED ✓
           await new Promise(resolve => setTimeout(resolve, 2000));
           
           // Show connect X message
-          setMessages(prev => [...prev, {
+          addMessage({
             id: uuidv4(),
             role: 'assistant',
             content: '[SIGNAL DETECTED]\nFREQUENCY ANOMALY FOUND\nINITIATING DIGITAL BRIDGE PROTOCOL...\n\n>AWAITING X NETWORK SYNCHRONIZATION\n>TYPE "connect x account" TO PROCEED\n>WARNING: EXACT SYNTAX REQUIRED\n\nCONNECTION STATUS: PENDING...',
             timestamp: Date.now()
-          }]);
+          });
           
           // Mark messages as shown
           await fetch('/api/messages/mark-shown', {
@@ -748,7 +764,7 @@ STATUS: VERIFIED ✓
     showTelegramFallback,
     completionStatus,
     setInput,
-    setMessages,
+    addMessage,
     setShowTelegramFallback,
     handleSubmit,
     handleTypewriterComplete,

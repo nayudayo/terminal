@@ -39,6 +39,13 @@ export async function initDb() {
           twitter_id TEXT UNIQUE,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS message_tracking (
+          user_id TEXT PRIMARY KEY,
+          connect_x_message_shown BOOLEAN DEFAULT FALSE,
+          post_push_message_shown BOOLEAN DEFAULT FALSE,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
       `);
     } catch (error) {
       console.error('Database initialization error:', error);

@@ -11,6 +11,7 @@ import { POST_PUSH_MESSAGE } from '@/constants/messages';
 import { PushButton } from './chat/PushButton';
 import AuthModal from './AuthModal';
 import AuthCheckModal from './AuthCheckModal';
+import CodeGeneratedModal from './CodeGeneratedModal';
 
 const MessageContent = ({ 
   message, 
@@ -19,7 +20,7 @@ const MessageContent = ({
 }: { 
   message: Message; 
   onTypewriterComplete: () => void;
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  setMessages: (newMessage: Message) => void;
 }) => {
   const handleFinalComplete = () => {
     onTypewriterComplete();
@@ -82,12 +83,12 @@ const MessageContent = ({
       <div className="font-['Courier_New'] text-sm leading-[1.2]">
         <PushButton onPushComplete={() => {
           handleFinalComplete();
-          setMessages(prev => [...prev, {
+          setMessages({
             id: uuidv4(),
             role: 'assistant',
             content: POST_PUSH_MESSAGE,
             timestamp: Date.now(),
-          }]);
+          });
         }} />
       </div>
     );
@@ -113,7 +114,7 @@ export default function Chat({ userId }: { userId: string }) {
     canType,
     showTelegramFallback,
     setInput,
-    setMessages,
+    addMessage,
     setShowTelegramFallback,
     handleSubmit,
     handleTypewriterComplete,
@@ -121,6 +122,7 @@ export default function Chat({ userId }: { userId: string }) {
 
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const [activeModal, setActiveModal] = useState<'none' | 'auth' | 'authCheck'>('none');
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
 
   const handleCommand = useCallback((event: CustomEvent) => {
     console.log('Received command:', event.detail);
@@ -135,16 +137,17 @@ export default function Chat({ userId }: { userId: string }) {
 
   const handleChatMessage = useCallback((event: CustomEvent) => {
     if (event.detail.type === 'AUTHENTICATED') {
-      setMessages(prev => [...prev, {
+      addMessage({
         id: uuidv4(),
         content: event.detail.message,
         role: 'assistant',
         timestamp: Date.now(),
         isAuthenticated: true,
-        user: event.detail.user
-      }]);
+      });
+    } else if (event.detail.type === 'CODE_GENERATED') {
+      setGeneratedCode(event.detail.code);
     }
-  }, [setMessages]);
+  }, [addMessage]);
 
   useEffect(() => {
     window.addEventListener('CHAT_COMMAND', handleCommand as EventListener);
@@ -181,12 +184,12 @@ export default function Chat({ userId }: { userId: string }) {
 
         if (response.ok) {
           const data = await response.json();
-          setMessages(prev => [...prev, {
+          addMessage({
             id: uuidv4(),
             content: data.message,
             role: 'assistant',
             timestamp: Date.now()
-          }]);
+          });
         }
       } catch (error) {
         console.error('Error loading current stage:', error);
@@ -194,7 +197,7 @@ export default function Chat({ userId }: { userId: string }) {
     };
 
     loadCurrentStage();
-  }, [userId, setMessages]);
+  }, [userId, addMessage]);
 
   const handleAuthStart = () => {
     setActiveModal('authCheck');
@@ -215,30 +218,33 @@ export default function Chat({ userId }: { userId: string }) {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-16rem)] rounded-lg relative">
+    <div className="flex flex-col h-[calc(100vh-4rem)] sm:h-[calc(100vh-16rem)] rounded-lg relative">
       <div 
         ref={messageContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto hide-scrollbar bg-black/95"
+        className="flex-1 min-h-0 overflow-y-auto hide-scrollbar bg-black/95 px-2 sm:px-4"
       >
-        <div className="p-4 font-mono whitespace-pre-wrap">
+        <div className="py-4 font-mono whitespace-pre-wrap break-words">
           {messages.map((message) => (
-            <div key={message.id} className="text-sm sm:text-base inline">
-              <span className="opacity-50 text-white select-none">
-                [{formatTimestamp(message.timestamp)}]
+            <div key={message.id} className="text-xs sm:text-sm md:text-base inline-block w-full">
+              <span className="opacity-50 text-white select-none break-keep">
+                [{formatTimestamp(message.timestamp || Date.now())}]
               </span>{' '}
               {message.role === 'user' ? (
-                <span className="text-white">
+                <span className="text-white break-all">
                   {`<${userId}> ${message.content}`}
                 </span>
               ) : (
-                <span className="inline">
-                  <span className="text-white select-none">
+                <span className="inline-block w-full">
+                  <span className="text-white select-none break-keep">
                     {`<Messenger> `}
                   </span>
                   <MessageContent 
-                    message={message} 
+                    message={{
+                      ...message,
+                      timestamp: message.timestamp || Date.now()
+                    }}
                     onTypewriterComplete={handleTypewriterComplete}
-                    setMessages={setMessages}
+                    setMessages={addMessage}
                   />
                 </span>
               )}
@@ -247,20 +253,21 @@ export default function Chat({ userId }: { userId: string }) {
           ))}
           
           {isTyping && (
-            <div className="opacity-50 glow-text-subtle animate-pulse inline">
-              <span className="text-white">Messenger is typing...</span>
+            <div className="opacity-50 glow-text-subtle animate-pulse inline-block">
+              <span className="text-white text-xs sm:text-sm">Messenger is typing...</span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="sticky bottom-0 left-0 right-0 mt-auto bg-black/95">
+      <div className="sticky bottom-0 left-0 right-0 mt-auto bg-black/95 border-t border-[#FF0000]/20">
         <ChatInput
           input={input}
           setInput={setInput}
           canType={canType}
           isLoading={isLoading}
           onSubmit={handleSubmit}
+          referralCode={generatedCode}
         />
       </div>
 
@@ -299,6 +306,12 @@ export default function Chat({ userId }: { userId: string }) {
         isOpen={activeModal === 'authCheck'}
         onAuthConfirmed={() => setActiveModal('none')}
         onRetryAuth={handleRetryAuth}
+      />
+
+      <CodeGeneratedModal
+        isOpen={!!generatedCode}
+        onClose={() => setGeneratedCode(null)}
+        code={generatedCode || ''}
       />
     </div>
   );

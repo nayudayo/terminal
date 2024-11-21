@@ -94,39 +94,39 @@ export default function AuthCheckModal({ isOpen, onAuthConfirmed, onRetryAuth }:
 
   return (
     <div 
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm
+      className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm
         transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
     >
       <div 
-        className={`bg-black border-2 border-[#FF0000] p-8 rounded-none max-w-md w-full mx-4
+        className={`bg-black border-2 border-[#FF0000] p-4 sm:p-8 rounded-none w-full max-w-[90vw] sm:max-w-md mx-2 sm:mx-4
           transform transition-all duration-300 shadow-[0_0_15px_rgba(255,0,0,0.3)]
           ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
       >
-        <div className="border-b-2 border-[#FF0000] pb-4 mb-6">
-          <h2 className="text-[#FF0000] text-2xl font-['Press_Start_2P'] glitch-text text-center">
+        <div className="border-b-2 border-[#FF0000] pb-3 sm:pb-4 mb-4 sm:mb-6">
+          <h2 className="text-[#FF0000] text-lg sm:text-2xl font-['Press_Start_2P'] glitch-text text-center">
             [AUTHENTICATION IN PROGRESS]
           </h2>
         </div>
 
-        <div className="space-y-6 mb-8">
-          <p className="text-[#FF0000] font-mono text-lg leading-relaxed tracking-wider text-center">
+        <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
+          <p className="text-[#FF0000] font-mono text-base sm:text-lg leading-relaxed tracking-wider text-center">
             COMPLETE THE AUTHENTICATION IN
             THE POPUP WINDOW
           </p>
-          <p className="text-[#FF0000]/80 font-mono text-center">
+          <p className="text-[#FF0000]/80 font-mono text-sm sm:text-base text-center">
             CLICK CONFIRM WHEN COMPLETE
           </p>
           
           {error && (
-            <div className="bg-[#FF0000]/10 border-2 border-[#FF0000] p-4 mt-4">
-              <p className="text-[#FF0000] font-mono text-sm text-center mb-4">
+            <div className="bg-[#FF0000]/10 border-2 border-[#FF0000] p-3 sm:p-4 mt-4">
+              <p className="text-[#FF0000] font-mono text-xs sm:text-sm text-center mb-3 sm:mb-4">
                 {error}
               </p>
               <div className="flex justify-center">
                 <button
                   onClick={handleRetry}
-                  className="px-4 py-2 bg-[#FF0000]/20 text-[#FF0000] hover:bg-[#FF0000]/30 
-                           transition-all duration-200 font-mono text-sm tracking-wider
+                  className="px-3 sm:px-4 py-2 bg-[#FF0000]/20 text-[#FF0000] hover:bg-[#FF0000]/30 
+                           transition-all duration-200 font-mono text-xs sm:text-sm tracking-wider
                            focus:outline-none focus:ring-2 focus:ring-[#FF0000] focus:ring-opacity-50"
                 >
                   RETRY AUTHENTICATION
@@ -136,16 +136,16 @@ export default function AuthCheckModal({ isOpen, onAuthConfirmed, onRetryAuth }:
           )}
         </div>
 
-        <div className="flex justify-center pt-4 border-t-2 border-[#FF0000]/20">
+        <div className="flex justify-center pt-3 sm:pt-4 border-t-2 border-[#FF0000]/20">
           <button
             onClick={handleConfirm}
             disabled={isChecking || !!error}
-            className="px-6 py-3 bg-[#FF0000] text-black hover:bg-[#CC0000] 
-                     transition-all duration-200 font-mono tracking-wider
+            className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-[#FF0000] text-black hover:bg-[#CC0000] 
+                     transition-all duration-200 font-mono text-sm sm:text-base tracking-wider
                      focus:outline-none focus:ring-2 focus:ring-[#FF0000] focus:ring-opacity-50
                      shadow-[0_0_10px_rgba(255,0,0,0.5)]
                      disabled:opacity-50 disabled:cursor-not-allowed
-                     min-w-[150px]"
+                     min-w-[120px] sm:min-w-[150px]"
           >
             {isChecking ? 'CHECKING...' : 'CONFIRM'}
           </button>

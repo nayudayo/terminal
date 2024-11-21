@@ -243,7 +243,6 @@ REQUIRED STEPS: [1/5]
 --------------------
 1. MANDATES [PENDING]
    >TYPE "mandates" TO BEGIN
-   >TYPE "skip mandates" TO BYPASS
 
 2. TELEGRAM SYNC [LOCKED]
 3. VERIFICATION CODE [LOCKED]

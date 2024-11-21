@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { ChatState, CompletionStatus, Message, ChatResponse } from '../types/chat';
 import { v4 as uuidv4 } from 'uuid';
-import { signIn } from 'next-auth/react';
 import {
   AUTHENTICATED_MESSAGE,
   INTRO_MESSAGE,
@@ -17,9 +16,13 @@ import {
   WALLET_MESSAGE,
   REFERENCE_MESSAGE,
 } from '@/constants/messages';
-import { validateWalletAddress } from '@/utils/walletValidation';
-import { verifyWalletTransactions } from '@/utils/transactionVerification';
 import { SessionStage } from '@/types/session';
+import { 
+  validateSolanaAddress, 
+  validateNearAddress, 
+  parseWalletCommand, 
+  verifyWalletTransaction 
+} from '@/lib/walletValidator';
 
 
 
@@ -367,25 +370,12 @@ useEffect(() => {
     }
 
     if (input.toLowerCase().startsWith('wallet ')) {
-      const walletAddress = input.slice(7).trim();
-      const validation = validateWalletAddress(walletAddress);
-      
-      if (!validation.isValid) {
+      const parsedWallets = parseWalletCommand(input);
+      if (!parsedWallets) {
         setMessages(prev => [...prev, {
           id: uuidv4(),
           role: 'assistant',
-          content: `[WALLET VALIDATION ERROR]
-${validation.error}
-
-SUPPORTED FORMATS:
----------------
-1. SOLANA:
-   ${WALLET_ERROR_MESSAGES.SOLANA.FORMAT}
-
-2. NEAR:
-   ${WALLET_ERROR_MESSAGES.NEAR.FORMAT}
-
-Please try again with a valid wallet address.`,
+          content: WALLET_ERROR_MESSAGES.GENERAL.INVALID,
           timestamp: Date.now(),
         }]);
         setIsLoading(false);
@@ -393,51 +383,95 @@ Please try again with a valid wallet address.`,
         return;
       }
 
-      // Verify transactions
-      const transactionVerification = await verifyWalletTransactions(
-        validation.solanaWallet!,
-        validation.nearWallet!,
-        process.env.NEXT_PUBLIC_SOLANA_DESTINATION!,
-        process.env.NEXT_PUBLIC_NEAR_DESTINATION!
-      );
+      try {
+        // Validate both addresses concurrently
+        const [solanaValidation, nearValidation] = await Promise.all([
+          validateSolanaAddress(parsedWallets.solanaAddress),
+          validateNearAddress(parsedWallets.nearAddress)
+        ]);
 
-      if (!transactionVerification.isVerified) {
-        setMessages(prev => [...prev, {
-          id: uuidv4(),
-          role: 'assistant',
-          content: `[TRANSACTION VERIFICATION FAILED]
-${transactionVerification.error}
+        // Check Solana validation
+        if (!solanaValidation.isValid) {
+          setMessages(prev => [...prev, {
+            id: uuidv4(),
+            role: 'assistant',
+            content: solanaValidation.error || WALLET_ERROR_MESSAGES.SOLANA.FORMAT,
+            timestamp: Date.now(),
+          }]);
+          setIsLoading(false);
+          setIsTyping(false);
+          return;
+        }
+
+        // Check NEAR validation
+        if (!nearValidation.isValid) {
+          setMessages(prev => [...prev, {
+            id: uuidv4(),
+            role: 'assistant',
+            content: nearValidation.error || WALLET_ERROR_MESSAGES.NEAR.FORMAT,
+            timestamp: Date.now(),
+          }]);
+          setIsLoading(false);
+          setIsTyping(false);
+          return;
+        }
+
+        // Verify transactions if needed
+        const [solanaVerified, nearVerified] = await Promise.all([
+          verifyWalletTransaction(parsedWallets.solanaAddress, 'solana'),
+          verifyWalletTransaction(parsedWallets.nearAddress, 'near')
+        ]);
+
+        if (!solanaVerified || !nearVerified) {
+          setMessages(prev => [...prev, {
+            id: uuidv4(),
+            role: 'assistant',
+            content: `[TRANSACTION VERIFICATION FAILED]
+=============================
+${WALLET_ERROR_MESSAGES.GENERAL.VERIFICATION_FAILED}
 
 Required:
-1. Transfer from Solana wallet to ${process.env.NEXT_PUBLIC_SOLANA_DESTINATION}
-2. Transfer from NEAR wallet to ${process.env.NEXT_PUBLIC_NEAR_DESTINATION}
+1. Solana wallet must have transaction history
+2. NEAR wallet must have transaction history
 
-Please complete the transfers and try again.`,
-          timestamp: Date.now(),
-        }]);
-        setIsLoading(false);
-        setIsTyping(false);
-        return;
-      }
+Please ensure both wallets are active and try again.`,
+            timestamp: Date.now(),
+          }]);
+          setIsLoading(false);
+          setIsTyping(false);
+          return;
+        }
 
-      // If valid and verified, proceed with submission
-      handleCommandComplete('submit wallet');
-      setMessages(prev => [...prev, {
-        id: uuidv4(),
-        role: 'assistant',
-        content: `[WALLET VERIFICATION COMPLETE]
+        // If valid and verified, proceed with submission
+        handleCommandComplete('submit wallet');
+        setMessages(prev => [...prev, {
+          id: uuidv4(),
+          role: 'assistant',
+          content: `[WALLET VERIFICATION COMPLETE]
 ============================
-SOLANA WALLET: ${validation.solanaWallet}
-NEAR WALLET: ${validation.nearWallet}
+SOLANA WALLET: ${parsedWallets.solanaAddress}
+NEAR WALLET: ${parsedWallets.nearAddress}
 STATUS: VERIFIED ✓
 
 [PROCEEDING TO NEXT STEP]
 >Type "help" to see available commands`,
-        timestamp: Date.now(),
-      }]);
-      setIsLoading(false);
-      setIsTyping(false);
-      return;
+          timestamp: Date.now(),
+        }]);
+        setIsLoading(false);
+        setIsTyping(false);
+        return;
+      } catch (error) {
+        console.error('Wallet verification error:', error);
+        setMessages(prev => [...prev, {
+          id: uuidv4(),
+          role: 'assistant',
+          content: WALLET_ERROR_MESSAGES.GENERAL.NETWORK_ERROR,
+          timestamp: Date.now(),
+        }]);
+        setIsLoading(false);
+        setIsTyping(false);
+        return;
+      }
     }
 
     try {
@@ -457,6 +491,13 @@ STATUS: VERIFIED ✓
 
       
       if (data.dispatchEvent === 'CONNECT_TWITTER') {
+        // Dispatch the event immediately
+        window.dispatchEvent(
+          new CustomEvent('CHAT_COMMAND', { 
+            detail: 'CONNECT_TWITTER'
+          })
+        );
+        
         setMessages(prev => [...prev, {
           id: uuidv4(),
           content: data.message,
@@ -464,8 +505,6 @@ STATUS: VERIFIED ✓
           timestamp: Date.now(),
         }]);
         
-        // Show the modal
-        setShowAuthModal(true);
         setIsLoading(false);
         setIsTyping(false);
         return;
@@ -524,7 +563,7 @@ STATUS: VERIFIED ✓
       setIsLoading(false);
       setIsTyping(false);
     }
-  }, [userId, input, isLoading, canType, handleCommandComplete, completionStatus, sessionStage, updateSessionStage, handleTelegramRedirect, handleTelegramCode, handleWalletSubmit, handleReferenceCode, handleProtocolComplete]);
+  }, [ input, isLoading, canType, handleCommandComplete, completionStatus, sessionStage, updateSessionStage, handleTelegramRedirect, handleTelegramCode, handleWalletSubmit, handleReferenceCode, handleProtocolComplete]);
 
 
 

@@ -2,10 +2,13 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { connect, keyStores } from 'near-api-js';
 import { WALLET_ERROR_MESSAGES } from '@/constants/messages';
 
+// Interfaces
 interface WalletValidationResult {
   isValid: boolean;
   error?: string;
   transactionCount?: number;
+  solanaWallet?: string;
+  nearWallet?: string;
 }
 
 interface ParsedWallets {
@@ -13,12 +16,16 @@ interface ParsedWallets {
   nearAddress: string;
 }
 
-// Solana connection
+// Rate limiting
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_ATTEMPTS = 5;
+const attempts = new Map<string, { count: number; timestamp: number }>();
+
+// Connections
 const solanaConnection = new Connection(
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com'
 );
 
-// NEAR connection config
 const nearConfig = {
   networkId: 'mainnet',
   nodeUrl: 'https://rpc.mainnet.near.org',
@@ -28,32 +35,71 @@ const nearConfig = {
   keyStore: new keyStores.InMemoryKeyStore()
 };
 
+// Basic format validation
+export const isValidBase58 = (str: string): boolean => {
+  const base58Regex = /^[1-9A-HJ-NP-Za-km-z]+$/;
+  return base58Regex.test(str);
+};
+
+export const isValidNearAddress = (str: string): boolean => {
+  if (!str.endsWith('.near') && !str.endsWith('.testnet')) return false;
+  const username = str.replace(/\.(near|testnet)$/, '');
+  if (username.length < 2 || username.length > 64) return false;
+  const validUsernameRegex = /^(?!-)[a-z0-9-]+(?<!-)$/;
+  if (!validUsernameRegex.test(username)) return false;
+  if (username.includes('--')) return false;
+  return true;
+};
+
+// Rate limiting
+export const checkRateLimit = (userId: string): boolean => {
+  const now = Date.now();
+  const userAttempts = attempts.get(userId);
+
+  if (!userAttempts) {
+    attempts.set(userId, { count: 1, timestamp: now });
+    return true;
+  }
+
+  if (now - userAttempts.timestamp > RATE_LIMIT_WINDOW) {
+    attempts.set(userId, { count: 1, timestamp: now });
+    return true;
+  }
+
+  if (userAttempts.count >= MAX_ATTEMPTS) {
+    return false;
+  }
+
+  attempts.set(userId, { 
+    count: userAttempts.count + 1, 
+    timestamp: userAttempts.timestamp 
+  });
+  return true;
+};
+
+// Full validation functions
 export async function validateSolanaAddress(address: string): Promise<WalletValidationResult> {
   try {
-    // Check length
-    if (address.length < 32 || address.length > 44) {
-      return { isValid: false, error: WALLET_ERROR_MESSAGES.SOLANA.LENGTH };
+    if (!isValidBase58(address) || address.length < 32 || address.length > 44) {
+      return { isValid: false, error: WALLET_ERROR_MESSAGES.SOLANA.FORMAT };
     }
 
-    // Try to create a PublicKey object
     const pubKey = new PublicKey(address);
-    
-    // Get transaction history
     const signatures = await solanaConnection.getSignaturesForAddress(pubKey, { limit: 10 });
     const transactionCount = signatures.length;
 
-    // Check if wallet has any transactions
     if (transactionCount === 0) {
       return { 
         isValid: false, 
-        error: 'No transactions found. Please use a wallet with transaction history.',
+        error: WALLET_ERROR_MESSAGES.SOLANA.NO_TRANSACTIONS,
         transactionCount: 0
       };
     }
 
     return { 
       isValid: true,
-      transactionCount
+      transactionCount,
+      solanaWallet: address
     };
   } catch (error) {
     console.error('Solana validation error:', error);

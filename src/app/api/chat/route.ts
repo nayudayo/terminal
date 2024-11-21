@@ -1,3 +1,4 @@
+import { Session } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/auth';
@@ -37,14 +38,21 @@ interface ReferralCode {
   created_at: string;
 }
 
-// Update the getStageMessage function to be more comprehensive
-function getStageMessage(stage: SessionStage): string {
+interface StructuredMessage {
+  prefix?: string;
+  command?: string;
+  middle?: string;
+  command2?: string;
+  suffix?: string;
+}
+
+function getStageMessage(stage: SessionStage): string | StructuredMessage {
   switch (stage) {
-    case SessionStage.INTRO_MESSAGE:
-      return STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0];
-    
     case SessionStage.POST_PUSH_MESSAGE:
       return STAGE_PROMPTS[SessionStage.POST_PUSH_MESSAGE].example_responses[0];
+    
+    case SessionStage.INTRO_MESSAGE:
+      return STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0];
     
     case SessionStage.CONNECT_TWITTER:
       return STAGE_PROMPTS[SessionStage.CONNECT_TWITTER].example_responses[0];
@@ -75,16 +83,24 @@ function getStageMessage(stage: SessionStage): string {
   }
 }
 
+const logStageTransition = async (userId: string, fromStage: SessionStage, toStage: SessionStage) => {
+  console.log(`[Stage Transition] User: ${userId} | ${SessionStage[fromStage]} -> ${SessionStage[toStage]}`);
+};
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as Session & {
+      user: {
+        id: string;
+        name: string;
+        email: string;
+      };
+      accessToken: string;
+    };
     const { message, userId } = await request.json();
 
-    // Handle LOAD_CURRENT_STAGE first
     if (message === 'LOAD_CURRENT_STAGE') {
       if (!session?.user?.id) {
-        // For unauthenticated users, return the intro message
         return NextResponse.json({
           message: STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0]
         });
@@ -94,12 +110,10 @@ export async function POST(request: Request) {
         let currentSession = await SessionManager.getSession(session.user.id);
         
         if (!currentSession) {
-          // Create new session if none exists
           currentSession = await SessionManager.createSession(session.user.id, SessionStage.INTRO_MESSAGE);
           console.log(`[New Session Created] User: ${session.user.id}, Stage: ${currentSession.stage}`);
         }
 
-        // Return the appropriate message for their current stage
         console.log(`[Loading Stage] User: ${session.user.id}, Stage: ${currentSession.stage}`);
         return NextResponse.json({
           message: getStageMessage(currentSession.stage)
@@ -112,53 +126,71 @@ export async function POST(request: Request) {
       }
     }
 
-    // Handle Twitter connection command first
     if (message.toLowerCase() === 'connect x account') {
+      console.log('[API] Handling connect x account command');
       if (session) {
-        // If already authenticated, update stage and show authenticated message
+        console.log('[API] User already authenticated');
         await SessionManager.updateSessionStage(session.user.id, SessionStage.AUTHENTICATED);
         
+        const db = await initDb();
+        await db.prepare(
+          `UPDATE message_tracking 
+           SET connect_x_message_shown = TRUE 
+           WHERE user_id = ?`
+        ).run(session.user.id);
+
         return NextResponse.json({
           message: AUTHENTICATED_MESSAGE.replace('ACCESS: GRANTED', `ACCESS: GRANTED\nUSER: ${session.user.name}`),
-          shouldAutoScroll: true
+          shouldAutoScroll: true,
+          dispatchEvent: 'AUTH_COMPLETE'
         });
       } else {
-        // If not authenticated, trigger Twitter auth
+        console.log('[API] Initiating Twitter auth');
         return NextResponse.json({
           message: PROTOCOL_MESSAGES.TWITTER_AUTH.INITIATING,
           dispatchEvent: 'CONNECT_TWITTER',
-          shouldAutoScroll: true
+          shouldAutoScroll: true,
+          isTyping: true,
+          action: 'CONNECT_TWITTER'
         });
       }
     }
 
-    // Then handle push button sequence
-    if (message.toLowerCase() === 'up_push_button') {
-      return NextResponse.json({
-        message: PROTOCOL_MESSAGES.BUTTON_SEQUENCE.ENGAGED,
-        shouldAutoScroll: true
-      });
+    if (message.toLowerCase() === 'up_push_button' || message.toLowerCase() === 'down_push_button') {
+      if (message.toLowerCase() === 'up_push_button') {
+        return NextResponse.json({
+          message: PROTOCOL_MESSAGES.BUTTON_SEQUENCE.ENGAGED,
+          shouldAutoScroll: true
+        });
+      }
+      
+      if (message.toLowerCase() === 'down_push_button') {
+        const currentSession = await SessionManager.getSession(userId);
+        const currentStage = currentSession?.stage || SessionStage.INTRO_MESSAGE;
+        await logStageTransition(userId, currentStage, SessionStage.POST_PUSH_MESSAGE);
+        await SessionManager.updateSessionStage(userId, SessionStage.POST_PUSH_MESSAGE);
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return NextResponse.json({
+          message: PROTOCOL_MESSAGES.BUTTON_SEQUENCE.SIGNAL_DETECTED,
+          shouldAutoScroll: true,
+          newStage: SessionStage.POST_PUSH_MESSAGE
+        });
+      }
     }
 
-    if (message.toLowerCase() === 'down_push_button') {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return NextResponse.json({
-        message: PROTOCOL_MESSAGES.BUTTON_SEQUENCE.SIGNAL_DETECTED,
-        shouldAutoScroll: true
-      });
-    }
-
-    // Then handle AI chat responses
     if (session) {
       let currentSession = await SessionManager.getSession(session.user.id);
       
-      // Create session if it doesn't exist
       if (!currentSession) {
         currentSession = await SessionManager.createSession(session.user.id, SessionStage.INTRO_MESSAGE);
         console.log(`[New Session Created] User: ${session.user.id}, Stage: ${currentSession.stage}`);
+        return NextResponse.json({
+          message: STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0],
+          shouldAutoScroll: true
+        });
       }
-      
-      // If they've completed the protocol, allow free chat
+
       if (currentSession.stage === SessionStage.PROTOCOL_COMPLETE) {
         const aiResponse = await generateResponse(message, SessionStage.PROTOCOL_COMPLETE);
         return NextResponse.json({
@@ -167,37 +199,54 @@ export async function POST(request: Request) {
         });
       }
 
-      // If message is not a command and they're still in protocol
-      if (!isCommand(message)) {
-        const aiResponse = await generateResponse(message, currentSession.stage);
-        
-        // Get stage transition if applicable
-        const transition = await SessionManager.handleStageTransition(
-          session.user.id,
-          currentSession.stage,
-          message
-        );
+      const allowedGPTStages = [
+        SessionStage.INTRO_MESSAGE,
+        SessionStage.POST_PUSH_MESSAGE,
+        SessionStage.CONNECT_TWITTER,
+        SessionStage.PROTOCOL_COMPLETE
+      ];
 
-        // If there's a stage transition, update Redis session
-        if (transition.newStage) {
-          await SessionManager.updateSessionStage(session.user.id, transition.newStage);
+      if (allowedGPTStages.includes(currentSession.stage)) {
+        if (!isCommand(message)) {
+          const aiResponse = await generateResponse(message, currentSession.stage);
+          
+          const transition = await SessionManager.handleStageTransition(
+            session.user.id,
+            currentSession.stage,
+            message
+          );
+
+          if (transition.newStage) {
+            await SessionManager.updateSessionStage(session.user.id, transition.newStage);
+            return NextResponse.json({
+              message: transition.response,
+              shouldAutoScroll: true,
+              newStage: transition.newStage
+            });
+          }
+
           return NextResponse.json({
-            message: transition.response,
-            shouldAutoScroll: true,
-            newStage: transition.newStage
+            message: aiResponse,
+            shouldAutoScroll: true
           });
         }
-
+      } else if (!isCommand(message)) {
+        const stagePrompt = STAGE_PROMPTS[currentSession.stage];
+        return NextResponse.json({
+          message: stagePrompt.example_responses[
+            Math.floor(Math.random() * stagePrompt.example_responses.length)
+          ],
+          shouldAutoScroll: true
+        });
+      }
+    } else {
+      if (!isCommand(message)) {
+        const aiResponse = await generateResponse(message, SessionStage.INTRO_MESSAGE);
         return NextResponse.json({
           message: aiResponse,
           shouldAutoScroll: true
         });
       }
-    } else {
-      // For unauthenticated users, return intro message instead of free chat
-      return NextResponse.json({
-        message: STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0]
-      });
     }
 
     // Handle skip mandates command
@@ -210,9 +259,19 @@ export async function POST(request: Request) {
 
       const currentSession = await SessionManager.getSession(session.user.id);
       
-      if (!currentSession || currentSession.stage > SessionStage.MANDATES) {
+      if (currentSession && currentSession.stage > SessionStage.MANDATES) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
         return NextResponse.json({
-          message: ERROR_MESSAGES.MANDATE_COMPLETED
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      if (!currentSession || currentSession.stage < SessionStage.MANDATES) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
         });
       }
 
@@ -220,12 +279,13 @@ export async function POST(request: Request) {
       return NextResponse.json({
         message: SUCCESS_MESSAGES.MANDATES_BYPASSED,
         commandComplete: true,
-        shouldAutoScroll: true
+        shouldAutoScroll: true,
+        newStage: SessionStage.TELEGRAM_REDIRECT
       });
     }
 
-    // Handle mandates command
-    if (message.toLowerCase() === 'mandates') {
+    // Handle follow/like commands
+    if (message.toLowerCase() === 'follow ptb') {
       if (!session) {
         return NextResponse.json({
           message: ERROR_MESSAGES.SESSION_REQUIRED
@@ -235,24 +295,15 @@ export async function POST(request: Request) {
       const currentSession = await SessionManager.getSession(session.user.id);
       
       if (currentSession && currentSession.stage > SessionStage.MANDATES) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
         return NextResponse.json({
-          message: ERROR_MESSAGES.MANDATE_COMPLETED
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
         });
       }
 
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.MANDATES);
-      return NextResponse.json({
-        message: MANDATES_MESSAGE
-      });
-    }
-
-    // Handle follow command
-    if (message.toLowerCase() === 'follow ptb') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
       try {
         const response = await fetch(new URL('/api/twitter/follow', request.url).toString(), {
           method: 'POST',
@@ -282,425 +333,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Handle like command
-    if (message.toLowerCase() === 'like ptb') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
-      try {
-        const response = await fetch(new URL('/api/twitter/like', request.url).toString(), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.accessToken}`,
-          },
-          body: JSON.stringify({ tweetId: 'target-tweet-id' }),
-        });
-        
-        if (response.ok) {
-          await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
-          
-          return NextResponse.json({
-            message: SUCCESS_MESSAGES.LIKE_COMPLETE,
-            commandComplete: true,
-            shouldAutoScroll: true,
-            newStage: SessionStage.TELEGRAM_REDIRECT
-          });
-        } else {
-          return NextResponse.json({
-            message: ERROR_MESSAGES.LIKE_FAILED
-          });
-        }
-      } catch (error) {
-        console.error(error);
-        return NextResponse.json({
-          message: ERROR_MESSAGES.LIKE_FAILED
-        });
-      }
-    }
-
-    // Handle telegram command
-    if (message.toLowerCase() === 'telegram') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
-
-      const currentSession = await SessionManager.getSession(session.user.id);
-      
-      if (!currentSession) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_NOT_FOUND
-        });
-      }
-
-      if (currentSession.stage === SessionStage.TELEGRAM_REDIRECT) {
-        return NextResponse.json({
-          message: TELEGRAM_MESSAGE
-        });
-      }
-
-      if (currentSession.stage < SessionStage.TELEGRAM_REDIRECT) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS
-        });
-      }
-
-      return NextResponse.json({
-        message: ERROR_MESSAGES.TELEGRAM_PHASE_ALREADY_COMPLETED
-      });
-    }
-
-    // Handle skip telegram command
-    if (message.toLowerCase() === 'skip telegram') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
-      
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
-      
-      return NextResponse.json({
-        message: SUCCESS_MESSAGES.TELEGRAM_BYPASSED,
-        commandComplete: true,
-        shouldAutoScroll: true
-      });
-    }
-
-    // Handle verify command
-    if (message.toLowerCase() === 'verify') {
-      if (!session) {
-        return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED\nPLEASE CONNECT X ACCOUNT FIRST'
-        });
-      }
-
-      const currentSession = await SessionManager.getSession(session.user.id);
-      
-      if (!currentSession || currentSession.stage < SessionStage.TELEGRAM_CODE) {
-        return NextResponse.json({
-          message: 'ERROR: MUST COMPLETE PREVIOUS STEPS FIRST'
-        });
-      }
-
-      if (currentSession.stage > SessionStage.TELEGRAM_CODE) {
-        return NextResponse.json({
-          message: 'ERROR: VERIFICATION PHASE ALREADY COMPLETED'
-        });
-      }
-
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
-      return NextResponse.json({
-        message: VERIFICATION_MESSAGE
-      });
-    }
-
-    // Handle skip verify command
-    if (message.toLowerCase() === 'skip verify') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
-
-      const currentSession = await SessionManager.getSession(session.user.id);
-      
-      if (!currentSession || currentSession.stage < SessionStage.TELEGRAM_CODE) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS
-        });
-      }
-
-      // Update to WALLET_SUBMIT stage
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
-      
-      return NextResponse.json({
-        message: SUCCESS_MESSAGES.VERIFICATION_BYPASSED,
-        commandComplete: true,
-        shouldAutoScroll: true,
-        newStage: SessionStage.WALLET_SUBMIT
-      });
-    }
-
-    // Handle wallet command
-    if (message.toLowerCase() === 'wallet') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
-
-      const currentSession = await SessionManager.getSession(session.user.id);
-      
-      if (!currentSession) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_NOT_FOUND
-        });
-      }
-
-      // Check if they're at the correct stage
-      if (currentSession.stage === SessionStage.WALLET_SUBMIT) {
-        return NextResponse.json({
-          message: WALLET_MESSAGE,
-          shouldAutoScroll: true
-        });
-      }
-
-      // If they're at an earlier stage
-      if (currentSession.stage < SessionStage.WALLET_SUBMIT) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS,
-          shouldAutoScroll: true
-        });
-      }
-
-      // If they're at a later stage
-      return NextResponse.json({
-        message: ERROR_MESSAGES.WALLET_PHASE_ALREADY_COMPLETED,
-        shouldAutoScroll: true
-      });
-    }
-
-    // Handle skip wallet command
-    if (message.toLowerCase() === 'skip wallet') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
-
-      const currentSession = await SessionManager.getSession(session.user.id);
-      
-      if (!currentSession || currentSession.stage < SessionStage.WALLET_SUBMIT) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS
-        });
-      }
-
-      // Update to REFERENCE_CODE stage
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.REFERENCE_CODE);
-      
-      return NextResponse.json({
-        message: SUCCESS_MESSAGES.WALLET_BYPASSED,
-        commandComplete: true,
-        shouldAutoScroll: true,
-        newStage: SessionStage.REFERENCE_CODE
-      });
-    }
-
-    // Handle reference command
-    if (message.toLowerCase() === 'reference') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
-
-      const currentSession = await SessionManager.getSession(session.user.id);
-      
-      if (!currentSession) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_NOT_FOUND
-        });
-      }
-
-      // Check if they're at the correct stage
-      if (currentSession.stage === SessionStage.REFERENCE_CODE) {
-        return NextResponse.json({
-          message: REFERENCE_MESSAGE,
-          shouldAutoScroll: true
-        });
-      }
-
-      // If they're at an earlier stage
-      if (currentSession.stage < SessionStage.REFERENCE_CODE) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS,
-          shouldAutoScroll: true
-        });
-      }
-
-      // If they're at a later stage
-      return NextResponse.json({
-        message: ERROR_MESSAGES.REFERENCE_PHASE_ALREADY_COMPLETED,
-        shouldAutoScroll: true
-      });
-    }
-
-    // Handle generate code command
-    if (message.toLowerCase() === 'generate code') {
-      if (!session?.user) {
-        return NextResponse.json({ 
-          message: PROTOCOL_MESSAGES.TWITTER_AUTH.MUST_AUTH 
-        });
-      }
-
-      const currentSession = await SessionManager.getSession(session.user.id);
-      
-      if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS
-        });
-      }
-
-      try {
-        const db = await initDb();
-        
-        // First check if user already has a code
-        const existingCode = await db.prepare(
-          'SELECT code FROM referral_codes WHERE twitter_id = ?'
-        ).get(session.user.id) as ReferralCode | undefined;
-
-        if (existingCode) {
-          // If they have a code, show it and complete protocol
-          await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
-          
-          return NextResponse.json({ 
-            message: SUCCESS_MESSAGES.REFERENCE_CODE_EXISTS(existingCode.code),
-            commandComplete: true,
-            shouldAutoScroll: true,
-            newStage: SessionStage.PROTOCOL_COMPLETE
-          });
-        }
-
-        // If no existing code, generate a new one
-        const code = await generateReferralCode(session.user.id, session.user.name || 'USER');
-        
-        // After successful generation, update stage
-        await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
-
-        return NextResponse.json({
-          message: SUCCESS_MESSAGES.REFERENCE_CODE_GENERATED(code),
-          commandComplete: true,
-          shouldAutoScroll: true,
-          newStage: SessionStage.PROTOCOL_COMPLETE
-        });
-      } catch (error) {
-        console.error('Error generating reference code:', error);
-        return NextResponse.json({
-          message: ERROR_MESSAGES.GENERATE_CODE_FAILED
-        });
-      }
-    }
-
-    // Handle submit code command
-    if (message.toLowerCase().startsWith('submit code ')) {
-      if (!session?.user) {
-        return NextResponse.json({ 
-          message: PROTOCOL_MESSAGES.TWITTER_AUTH.MUST_AUTH 
-        });
-      }
-
-      const code = message.split(' ')[2];
-      if (!code) {
-        return NextResponse.json({ 
-          message: ERROR_MESSAGES.INVALID_CODE_FORMAT 
-        });
-      }
-
-      try {
-        const db = await initDb();
-        
-        // Verify code first
-        const referralCode = await db.prepare(
-          'SELECT * FROM referral_codes WHERE code = ? AND twitter_id != ?'
-        ).get(code, session.user.id);
-
-        if (!referralCode) {
-          return NextResponse.json({
-            message: ERROR_MESSAGES.INVALID_REFERENCE_CODE
-          });
-        }
-
-        // Check if user already used a code
-        const existingUse = await db.prepare(
-          'SELECT * FROM referral_uses WHERE used_by_twitter_id = ?'
-        ).get(session.user.id);
-
-        if (existingUse) {
-          return NextResponse.json({
-            message: ERROR_MESSAGES.YOU_HAVE_ALREADY_USED_A_REFERENCE_CODE
-          });
-        }
-
-        // Record code use
-        await db.prepare(
-          'INSERT INTO referral_uses (code, used_by_twitter_id) VALUES (?, ?)'
-        ).run(code, session.user.id);
-
-        // Update use count
-        await db.prepare(
-          'UPDATE referral_codes SET used_count = used_count + 1 WHERE code = ?'
-        ).run(code);
-
-        // Only after successful code submission, update stage
-        await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
-
-        return NextResponse.json({
-          message: SUCCESS_MESSAGES.REFERENCE_ACCEPTED,
-          commandComplete: true,
-          shouldAutoScroll: true,
-          newStage: SessionStage.PROTOCOL_COMPLETE
-        });
-      } catch (error) {
-        console.error('Error submitting code:', error);
-        return NextResponse.json({
-          message: ERROR_MESSAGES.CODE_SUBMISSION_FAILED
-        });
-      }
-    }
-
-    // Handle skip reference command
-    if (message.toLowerCase() === 'skip reference') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
-      return NextResponse.json({
-        message: SUCCESS_MESSAGES.REFERENCE_BYPASSED,
-        commandComplete: true,
-        shouldAutoScroll: true
-      });
-    }
-
-    // Handle join telegram command
-    if (message.toLowerCase() === 'join telegram') {
-      if (!session) {
-        return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
-        });
-      }
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
-      return NextResponse.json({
-        message: PROTOCOL_MESSAGES.TELEGRAM.JOIN_COMPLETE,
-        commandComplete: true,
-        shouldAutoScroll: true
-      });
-    }
-
-    // Handle verify code command
-    if (message.toLowerCase().startsWith('verify ')) {
-      if (!session) {
-        return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
-        });
-      }
-      // Add your code verification logic here
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
-      return NextResponse.json({
-        message: PROTOCOL_MESSAGES.VERIFICATION.COMPLETE,
-        commandComplete: true,
-        shouldAutoScroll: true
-      });
-    }
-
-    // Handle wallet submission command
+    // Handle wallet submission
     if (message.toLowerCase().startsWith('wallet ')) {
       if (!session) {
         return NextResponse.json({
@@ -744,6 +377,18 @@ export async function POST(request: Request) {
           });
         }
 
+        // Verify transactions if needed
+        const transactionVerification = await Promise.all([
+          verifyWalletTransaction(parsedWallets.solanaAddress, 'solana'),
+          verifyWalletTransaction(parsedWallets.nearAddress, 'near')
+        ]);
+
+        if (!transactionVerification[0] || !transactionVerification[1]) {
+          return NextResponse.json({
+            message: WALLET_ERROR_MESSAGES.GENERAL.VERIFICATION_FAILED
+          });
+        }
+
         // Store wallet addresses in session
         await SessionManager.updateSessionStage(
           session.user.id, 
@@ -768,11 +413,201 @@ export async function POST(request: Request) {
       }
     }
 
+    // Handle reference code commands
+    if (message.toLowerCase() === 'generate code') {
+      if (!session?.user) {
+        return NextResponse.json({ 
+          message: PROTOCOL_MESSAGES.TWITTER_AUTH.MUST_AUTH 
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
+        });
+      }
+
+      try {
+        const db = await initDb();
+        const existingCode = await db.prepare(
+          'SELECT code FROM referral_codes WHERE twitter_id = ?'
+        ).get(session.user.id) as ReferralCode | undefined;
+
+        if (existingCode) {
+          await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
+          return NextResponse.json({ 
+            message: SUCCESS_MESSAGES.REFERENCE_CODE_EXISTS(existingCode.code),
+            commandComplete: true,
+            shouldAutoScroll: true,
+            newStage: SessionStage.PROTOCOL_COMPLETE
+          });
+        }
+
+        const code = await generateReferralCode(session.user.id, session.user.name || 'USER');
+        await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
+
+        return NextResponse.json({
+          message: SUCCESS_MESSAGES.REFERENCE_CODE_GENERATED(code),
+          commandComplete: true,
+          shouldAutoScroll: true,
+          newStage: SessionStage.PROTOCOL_COMPLETE
+        });
+      } catch (error) {
+        console.error('Error generating reference code:', error);
+        return NextResponse.json({
+          message: ERROR_MESSAGES.GENERATE_CODE_FAILED
+        });
+      }
+    }
+
+    // Handle like command
+    if (message.toLowerCase() === 'like ptb') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (currentSession && currentSession.stage > SessionStage.MANDATES) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
+        return NextResponse.json({
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      try {
+        const response = await fetch(new URL('/api/twitter/like', request.url).toString(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.accessToken}`,
+          },
+          body: JSON.stringify({ tweetId: 'target-tweet-id' }),
+        });
+        
+        if (response.ok) {
+          await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
+          
+          return NextResponse.json({
+            message: SUCCESS_MESSAGES.LIKE_COMPLETE,
+            commandComplete: true,
+            shouldAutoScroll: true,
+            newStage: SessionStage.TELEGRAM_REDIRECT
+          });
+        } else {
+          return NextResponse.json({
+            message: ERROR_MESSAGES.LIKE_FAILED
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        return NextResponse.json({
+          message: ERROR_MESSAGES.LIKE_FAILED
+        });
+      }
+    }
+
+    // Handle telegram command
+    if (message.toLowerCase() === 'telegram') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (currentSession && currentSession.stage > SessionStage.TELEGRAM_REDIRECT) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
+        return NextResponse.json({
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      if (currentSession && currentSession.stage < SessionStage.TELEGRAM_REDIRECT) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
+        });
+      }
+
+      return NextResponse.json({
+        message: ERROR_MESSAGES.TELEGRAM_PHASE_ALREADY_COMPLETED
+      });
+    }
+
+    // Handle skip telegram command
+    if (message.toLowerCase() === 'skip telegram') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+      
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
+      
+      return NextResponse.json({
+        message: SUCCESS_MESSAGES.TELEGRAM_BYPASSED,
+        commandComplete: true,
+        shouldAutoScroll: true
+      });
+    }
+
+    // Handle verify command
+    if (message.toLowerCase() === 'verify') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (currentSession && currentSession.stage > SessionStage.TELEGRAM_CODE) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
+        return NextResponse.json({
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      if (currentSession && currentSession.stage > SessionStage.TELEGRAM_CODE) {
+        return NextResponse.json({
+          message: 'ERROR: VERIFICATION PHASE ALREADY COMPLETED'
+        });
+      }
+
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
+      return NextResponse.json({
+        message: VERIFICATION_MESSAGE
+      });
+    }
+
     // Handle show referral code command
     if (message.toLowerCase() === 'show referral code') {
       if (!session) {
         return NextResponse.json({
           message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      // Check if they're in the correct stage
+      if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
         });
       }
 
@@ -784,12 +619,39 @@ export async function POST(request: Request) {
 
         if (!existingCode) {
           return NextResponse.json({
-            message: RESPONSE_MESSAGES.NO_REFERENCE_CODE
+            message: `[NO REFERENCE CODE FOUND]
+=============================
+You haven't generated a reference code yet.
+
+Available Actions:
+----------------
+1. GENERATE NEW CODE
+   >TYPE "generate code" TO CREATE
+
+2. SUBMIT EXISTING CODE
+   >TYPE "submit code <CODE>" TO VERIFY
+
+3. BYPASS REFERENCE
+   >TYPE "skip reference" TO BYPASS
+
+>PROCEED WITH DESIRED ACTION`
           });
         }
 
         return NextResponse.json({
-          message: RESPONSE_MESSAGES.REFERENCE_CODE_RETRIEVED(existingCode.code)
+          message: `[REFERENCE CODE RETRIEVED]
+=============================
+YOUR REFERENCE CODE: ${existingCode.code}
+
+Available Actions:
+----------------
+1. SHARE THIS CODE WITH OTHERS
+2. SUBMIT DIFFERENT CODE:
+   >TYPE "submit code <CODE>"
+3. BYPASS REFERENCE:
+   >TYPE "skip reference"
+
+>PROCEED WITH DESIRED ACTION`
         });
       } catch (error) {
         console.error('Error retrieving code:', error);
@@ -797,6 +659,304 @@ export async function POST(request: Request) {
           message: ERROR_MESSAGES.REFERENCE_FAILED
         });
       }
+    }
+
+    // Handle submit code command
+    if (message.toLowerCase().startsWith('submit code ')) {
+      if (!session?.user) {
+        return NextResponse.json({ 
+          message: PROTOCOL_MESSAGES.TWITTER_AUTH.MUST_AUTH 
+        });
+      }
+
+      const code = message.split(' ')[2];
+      if (!code) {
+        return NextResponse.json({ 
+          message: ERROR_MESSAGES.INVALID_CODE_FORMAT 
+        });
+      }
+
+      try {
+        const db = await initDb();
+        
+        // Check if code exists and wasn't created by the same user
+        const referralCode = await db.prepare(
+          'SELECT * FROM referral_codes WHERE code = ? AND twitter_id != ?'
+        ).get(code, session.user.id);
+
+        if (!referralCode) {
+          return NextResponse.json({
+            message: ERROR_MESSAGES.INVALID_REFERENCE_CODE
+          });
+        }
+
+        // Check if user already used a code
+        const existingUse = await db.prepare(
+          'SELECT * FROM referral_uses WHERE used_by_twitter_id = ?'
+        ).get(session.user.id);
+
+        if (existingUse) {
+          return NextResponse.json({
+            message: ERROR_MESSAGES.YOU_HAVE_ALREADY_USED_A_REFERENCE_CODE
+          });
+        }
+
+        // Record code use
+        await db.prepare(
+          'INSERT INTO referral_uses (code, used_by_twitter_id) VALUES (?, ?)'
+        ).run(code, session.user.id);
+
+        // Update use count
+        await db.prepare(
+          'UPDATE referral_codes SET used_count = used_count + 1 WHERE code = ?'
+        ).run(code);
+
+        // Update session to PROTOCOL_COMPLETE
+        await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
+
+        return NextResponse.json({
+          message: SUCCESS_MESSAGES.REFERENCE_ACCEPTED,
+          commandComplete: true,
+          shouldAutoScroll: true,
+          newStage: SessionStage.PROTOCOL_COMPLETE
+        });
+      } catch (error) {
+        console.error('Error submitting code:', error);
+        return NextResponse.json({
+          message: ERROR_MESSAGES.CODE_SUBMISSION_FAILED
+        });
+      }
+    }
+
+    // Handle mandates command
+    if (message.toLowerCase() === 'mandates') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (currentSession && currentSession.stage > SessionStage.MANDATES) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
+        return NextResponse.json({
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.MANDATES);
+      return NextResponse.json({
+        message: MANDATES_MESSAGE
+      });
+    }
+
+    // Handle join telegram command
+    if (message.toLowerCase() === 'join telegram') {
+      if (!session) {
+        return NextResponse.json({
+          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+        });
+      }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
+      return NextResponse.json({
+        message: PROTOCOL_MESSAGES.TELEGRAM.JOIN_COMPLETE,
+        commandComplete: true,
+        shouldAutoScroll: true
+      });
+    }
+
+    // Handle verify code command
+    if (message.toLowerCase().startsWith('verify ')) {
+      if (!session) {
+        return NextResponse.json({
+          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+        });
+      }
+      // Add your code verification logic here
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
+      return NextResponse.json({
+        message: PROTOCOL_MESSAGES.VERIFICATION.COMPLETE,
+        commandComplete: true,
+        shouldAutoScroll: true
+      });
+    }
+
+    // Handle skip reference command
+    if (message.toLowerCase() === 'skip reference') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
+      return NextResponse.json({
+        message: SUCCESS_MESSAGES.REFERENCE_BYPASSED,
+        commandComplete: true,
+        shouldAutoScroll: true
+      });
+    }
+
+    // Handle skip verify command
+    if (message.toLowerCase() === 'skip verify') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (!currentSession || currentSession.stage < SessionStage.TELEGRAM_CODE) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
+        });
+      }
+
+      // Update to WALLET_SUBMIT stage
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
+      
+      return NextResponse.json({
+        message: SUCCESS_MESSAGES.VERIFICATION_BYPASSED,
+        commandComplete: true,
+        shouldAutoScroll: true,
+        newStage: SessionStage.WALLET_SUBMIT
+      });
+    }
+
+    // Handle wallet command (without parameters)
+    if (message.toLowerCase() === 'wallet') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (currentSession && currentSession.stage > SessionStage.WALLET_SUBMIT) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
+        return NextResponse.json({
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      if (!currentSession || currentSession.stage < SessionStage.WALLET_SUBMIT) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
+        });
+      }
+
+      return NextResponse.json({
+        message: WALLET_MESSAGE
+      });
+    }
+
+    // Handle skip wallet command
+    if (message.toLowerCase() === 'skip wallet') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (!currentSession || currentSession.stage < SessionStage.WALLET_SUBMIT) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
+        });
+      }
+
+      if (currentSession && currentSession.stage > SessionStage.WALLET_SUBMIT) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
+        return NextResponse.json({
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.REFERENCE_CODE);
+      return NextResponse.json({
+        message: SUCCESS_MESSAGES.WALLET_BYPASSED,
+        commandComplete: true,
+        shouldAutoScroll: true,
+        newStage: SessionStage.REFERENCE_CODE
+      });
+    }
+
+    // Handle reference command
+    if (message.toLowerCase() === 'reference') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
+        });
+      }
+
+      if (currentSession && currentSession.stage > SessionStage.REFERENCE_CODE) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
+        return NextResponse.json({
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      return NextResponse.json({
+        message: REFERENCE_MESSAGE
+      });
+    }
+
+    // Handle skip reference command
+    if (message.toLowerCase() === 'skip reference') {
+      if (!session) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.SESSION_REQUIRED
+        });
+      }
+
+      const currentSession = await SessionManager.getSession(session.user.id);
+      
+      if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
+        });
+      }
+
+      if (currentSession && currentSession.stage > SessionStage.REFERENCE_CODE) {
+        const currentStageMessage = getStageMessage(currentSession.stage);
+        return NextResponse.json({
+          message: `[CURRENT PROTOCOL STAGE]
+=============================
+${currentStageMessage}`,
+          shouldAutoScroll: true
+        });
+      }
+
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
+      return NextResponse.json({
+        message: SUCCESS_MESSAGES.REFERENCE_BYPASSED,
+        commandComplete: true,
+        shouldAutoScroll: true,
+        newStage: SessionStage.PROTOCOL_COMPLETE
+      });
     }
 
   } catch (error) {

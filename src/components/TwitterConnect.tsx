@@ -10,9 +10,15 @@ import AuthCheckModal from '@/components/AuthCheckModal';
 
 interface TwitterConnectProps {
   onAuthModalChange?: (show: boolean) => void;
+  dispatchEvent?: string;
+  action?: string;
 }
 
-export default function TwitterConnect({ onAuthModalChange }: TwitterConnectProps) {
+export default function TwitterConnect({ 
+  onAuthModalChange, 
+  dispatchEvent, 
+  action 
+}: TwitterConnectProps) {
   const { data: session, status, update } = useSession();
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +104,7 @@ export default function TwitterConnect({ onAuthModalChange }: TwitterConnectProp
     }
   };
 
-  // Listen for command trigger
+  // Listen for command trigger from both event and props
   useEffect(() => {
     const handleCommand = (event: ChatCommandEvent) => {
       if (event.detail === 'CONNECT_TWITTER') {
@@ -109,13 +115,16 @@ export default function TwitterConnect({ onAuthModalChange }: TwitterConnectProp
 
     window.addEventListener('CHAT_COMMAND', handleCommand as EventListener);
     
-    console.log('Twitter connect listener attached');
+    // Also check props for direct triggers
+    if (dispatchEvent === 'CONNECT_TWITTER' || action === 'CONNECT_TWITTER') {
+      console.log('Received CONNECT_TWITTER via props');
+      setShowAuthModal(true);
+    }
     
     return () => {
       window.removeEventListener('CHAT_COMMAND', handleCommand as EventListener);
-      console.log('Twitter connect listener removed');
     };
-  }, []);
+  }, [dispatchEvent, action]);
 
   // Listen for auth completion
   useEffect(() => {
@@ -185,6 +194,7 @@ export default function TwitterConnect({ onAuthModalChange }: TwitterConnectProp
       <AuthCheckModal
         isOpen={showAuthCheckModal}
         onAuthConfirmed={handleAuthConfirmed}
+        onRetryAuth={handleConnect}
       />
     </div>
   );

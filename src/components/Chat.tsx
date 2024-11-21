@@ -3,15 +3,15 @@
 import { useChat } from '../hooks/useChat';
 import { ChatInput } from './chat/ChatInput';
 import { formatTimestamp } from '@/utils/formatters';
-import { Message, CompletionStatus } from '@/types/chat';
-import { useRef, useEffect } from 'react';
+import { Message } from '@/types/chat';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { Typewriter } from './chat/Typewriter';
 import { v4 as uuidv4 } from 'uuid';
 import { POST_PUSH_MESSAGE } from '@/constants/messages';
 import { PushButton } from './chat/PushButton';
 import AuthModal from './AuthModal';
+import AuthCheckModal from './AuthCheckModal';
 
-// Create a MessageContent component to handle different message types
 const MessageContent = ({ 
   message, 
   onTypewriterComplete,
@@ -25,7 +25,6 @@ const MessageContent = ({
     onTypewriterComplete();
   };
 
-  // For INTRO_MESSAGE type
   if (typeof message.content === 'object' && 'prefix' in message.content && 'command1' in message.content) {
     const fullText = 
       message.content.prefix +
@@ -53,7 +52,6 @@ const MessageContent = ({
     );
   }
 
-  // For POST_PUSH_MESSAGE type
   if (typeof message.content === 'object' && 'prefix' in message.content && 'command' in message.content) {
     const fullText = 
       message.content.prefix +
@@ -79,7 +77,6 @@ const MessageContent = ({
     );
   }
 
-  // For ASCII art push button
   if (message.showButton && typeof message.content === 'string') {
     return (
       <div className="font-['Courier_New'] text-sm leading-[1.2]">
@@ -96,7 +93,6 @@ const MessageContent = ({
     );
   }
 
-  // For regular string messages
   if (typeof message.content === 'string') {
     return (
       <div className="inline font-['Courier_New'] text-sm leading-[1.2]">
@@ -107,25 +103,6 @@ const MessageContent = ({
 
   return null;
 };
-
-// Add this interface at the top of the file
-interface ChatHookReturn {
-  messages: Message[];
-  input: string;
-  isLoading: boolean;
-  isTyping: boolean;
-  canType: boolean;
-  showTelegramFallback: boolean;
-  completionStatus: CompletionStatus;
-  setInput: React.Dispatch<React.SetStateAction<string>>;
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  setShowTelegramFallback: React.Dispatch<React.SetStateAction<boolean>>;
-  handleSubmit: (e: React.FormEvent) => Promise<void>;
-  handleTypewriterComplete: () => void;
-  showAuthModal: boolean;
-  setShowAuthModal: React.Dispatch<React.SetStateAction<boolean>>;
-  handleAuthConnect: () => void;
-}
 
 export default function Chat({ userId }: { userId: string }) {
   const {
@@ -140,25 +117,52 @@ export default function Chat({ userId }: { userId: string }) {
     setShowTelegramFallback,
     handleSubmit,
     handleTypewriterComplete,
-    showAuthModal,
-    setShowAuthModal,
-    handleAuthConnect,
-  } = useChat(userId) as ChatHookReturn;
+  } = useChat(userId);
 
   const messageContainerRef = useRef<HTMLDivElement>(null);
+  const [activeModal, setActiveModal] = useState<'none' | 'auth' | 'authCheck'>('none');
 
-  const scrollToBottom = () => {
+  const handleCommand = useCallback((event: CustomEvent) => {
+    console.log('Received command:', event.detail);
+    
+    if (event.detail === 'CONNECT_TWITTER') {
+      console.log('Setting active modal to auth');
+      setActiveModal('auth');
+    } else if (event.detail === 'AUTH_COMPLETE') {
+      setActiveModal('none');
+    }
+  }, []);
+
+  const handleChatMessage = useCallback((event: CustomEvent) => {
+    if (event.detail.type === 'AUTHENTICATED') {
+      setMessages(prev => [...prev, {
+        id: uuidv4(),
+        content: event.detail.message,
+        role: 'assistant',
+        timestamp: Date.now(),
+        isAuthenticated: true,
+        user: event.detail.user
+      }]);
+    }
+  }, [setMessages]);
+
+  useEffect(() => {
+    window.addEventListener('CHAT_COMMAND', handleCommand as EventListener);
+    window.addEventListener('CHAT_MESSAGE', handleChatMessage as EventListener);
+    
+    return () => {
+      window.removeEventListener('CHAT_COMMAND', handleCommand as EventListener);
+      window.removeEventListener('CHAT_MESSAGE', handleChatMessage as EventListener);
+    };
+  }, [handleCommand, handleChatMessage]);
+
+  useEffect(() => {
     if (messageContainerRef.current) {
       messageContainerRef.current.scrollTo({
         top: messageContainerRef.current.scrollHeight,
         behavior: 'smooth'
       });
     }
-  };
-
-  // Add effect for auto-scroll
-  useEffect(() => {
-    scrollToBottom();
   }, [messages]);
 
   useEffect(() => {
@@ -192,9 +196,26 @@ export default function Chat({ userId }: { userId: string }) {
     loadCurrentStage();
   }, [userId, setMessages]);
 
+  const handleAuthStart = () => {
+    setActiveModal('authCheck');
+    const width = 600;
+    const height = 600;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+
+    window.open(
+      '/api/auth/signin/twitter',
+      'Twitter Auth',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+  };
+
+  const handleRetryAuth = () => {
+    setActiveModal('auth');
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-16rem)] rounded-lg relative">
-      {/* Messages container with solid background */}
       <div 
         ref={messageContainerRef}
         className="flex-1 min-h-0 overflow-y-auto hide-scrollbar bg-black/95"
@@ -233,7 +254,6 @@ export default function Chat({ userId }: { userId: string }) {
         </div>
       </div>
 
-      {/* Input section - fixed at bottom */}
       <div className="sticky bottom-0 left-0 right-0 mt-auto bg-black/95">
         <ChatInput
           input={input}
@@ -244,7 +264,6 @@ export default function Chat({ userId }: { userId: string }) {
         />
       </div>
 
-      {/* Telegram fallback */}
       {showTelegramFallback && (
         <div className="absolute bottom-24 left-4 right-4 bg-black/90 border border-[#FF0000]/20 rounded-lg p-4 shadow-lg">
           <div className="flex justify-between items-start">
@@ -269,15 +288,17 @@ export default function Chat({ userId }: { userId: string }) {
         </div>
       )}
 
-      {/* Auth Modal */}
       <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onConnect={handleAuthConnect}
-        onAuthStart={() => {
-          setShowAuthModal(false);
-          // Add any additional auth start logic here
-        }}
+        isOpen={activeModal === 'auth'}
+        onClose={() => setActiveModal('none')}
+        onConnect={() => setActiveModal('authCheck')}
+        onAuthStart={handleAuthStart}
+      />
+
+      <AuthCheckModal
+        isOpen={activeModal === 'authCheck'}
+        onAuthConfirmed={() => setActiveModal('none')}
+        onRetryAuth={handleRetryAuth}
       />
     </div>
   );

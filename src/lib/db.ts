@@ -14,7 +14,7 @@ export async function initDb() {
         fs.mkdirSync(dataDir, { recursive: true });
       }
 
-      const dbPath = path.join(dataDir, 'database.sqlite');
+      const dbPath = path.join(dataDir, 'referral-codes.db');
       db = new Database(dbPath, { verbose: console.log });
       
       // Initialize tables
@@ -139,4 +139,18 @@ export async function createUserMapping(originalUserId: string) {
 // Make sure the database is closed when the process exits
 process.on('exit', () => {
   closeDb();
-}); 
+});
+
+export async function getReferralCode(twitterId: string): Promise<string | null> {
+  const db = await initDb();
+  try {
+    const result = await db.prepare(
+      'SELECT code FROM referral_codes WHERE twitter_id = ?'
+    ).get(twitterId) as { code: string } | undefined;
+
+    return result?.code || null;
+  } catch (error) {
+    console.error('Error retrieving referral code:', error);
+    return null;
+  }
+} 

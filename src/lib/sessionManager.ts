@@ -1,7 +1,6 @@
 import { getRedisClient } from './redis';
 import { SessionStage, UserSession } from '@/types/session';
 import { STAGE_PROMPTS } from '@/constants/prompts';
-import { checkRedisHealth } from './redis';
 import { generateResponse } from './gptHandler';
 
 export class SessionManager {
@@ -18,22 +17,14 @@ export class SessionManager {
     
     try {
       const redis = getRedisClient();
-      const isHealthy = await checkRedisHealth();
-      
-      if (isHealthy) {
-        await redis.set(
-          `${this.KEY_PREFIX}${userId}`,
-          JSON.stringify(session),
-          'EX',
-          this.SESSION_EXPIRY
-        );
-        console.log(`[Session Created] User: ${userId}, Stage: ${SessionStage.INTRO_MESSAGE}`);
-        return userId;
-      } else {
-        console.error('[Redis Health Check Failed] Falling back to local storage');
-        localStorage.setItem(`${this.KEY_PREFIX}${userId}`, JSON.stringify(session));
-        return userId;
-      }
+      await redis.set(
+        `${this.KEY_PREFIX}${userId}`,
+        JSON.stringify(session),
+        'EX',
+        this.SESSION_EXPIRY
+      );
+      console.log(`[Session Created] User: ${userId}, Stage: ${SessionStage.INTRO_MESSAGE}`);
+      return userId;
     } catch (error) {
       console.error(`[Session Creation Failed] Error: ${error}`);
       throw new Error('Failed to create session');
@@ -58,7 +49,6 @@ export class SessionManager {
       const session = JSON.parse(data);
       console.log(`[Session Retrieved] User: ${userId}, Stage: ${session.stage}`);
       
-      // Refresh expiry on access
       await redis.expire(`${this.KEY_PREFIX}${userId}`, this.SESSION_EXPIRY);
       
       return session;
@@ -79,8 +69,6 @@ export class SessionManager {
 
     try {
       const redis = getRedisClient();
-      
-      // Get existing session
       const existingSession = await redis.get(`${this.KEY_PREFIX}${userId}`);
       if (!existingSession) {
         console.log(`[Creating New Session] User: ${userId}, Stage: ${stage}`);
@@ -88,7 +76,6 @@ export class SessionManager {
 
       let session = existingSession ? JSON.parse(existingSession) : { userId };
 
-      // Update session data
       session = {
         ...session,
         ...additionalData,
@@ -96,7 +83,6 @@ export class SessionManager {
         timestamp: Date.now()
       };
 
-      // Save to Redis with proper expiration
       await redis.set(
         `${this.KEY_PREFIX}${userId}`,
         JSON.stringify(session),
@@ -106,7 +92,6 @@ export class SessionManager {
 
       console.log(`[Session Stage Updated] User: ${userId}, Stage: ${stage}`);
       
-      // Verify the update
       const updatedSession = await redis.get(`${this.KEY_PREFIX}${userId}`);
       if (!updatedSession) {
         throw new Error('Session update verification failed');
@@ -127,19 +112,19 @@ export class SessionManager {
     currentStage: SessionStage,
     message: string
   ): Promise<{ newStage?: SessionStage; response: string }> {
-    console.log(`[Stage Transition] Processing - User: ${userId}, Current Stage: ${currentStage}, Message: ${message}`);
-    
-    const stagePrompt = STAGE_PROMPTS[currentStage];
-    if (!stagePrompt) {
-      console.warn(`[Stage Transition] No prompt found for stage ${currentStage}`);
-      return { response: "ERROR: Invalid stage" };
-    }
+    console.log(`[Stage Transition Check] User: ${userId} | Current: ${SessionStage[currentStage]} | Message: ${message}`);
 
     try {
+      const stagePrompt = STAGE_PROMPTS[currentStage];
+      if (!stagePrompt) {
+        console.warn(`[Stage Transition] No prompt found for stage ${currentStage}`);
+        return { response: "ERROR: Invalid stage" };
+      }
+
       switch (currentStage) {
         case SessionStage.INTRO_MESSAGE:
           if (message.toLowerCase() === 'push') {
-            console.log(`[Stage Transition] INTRO -> POST_PUSH`);
+            console.log(`[Stage Transition] INTRO_MESSAGE -> POST_PUSH_MESSAGE`);
             return {
               newStage: SessionStage.POST_PUSH_MESSAGE,
               response: STAGE_PROMPTS[SessionStage.POST_PUSH_MESSAGE].example_responses[0]
@@ -149,7 +134,7 @@ export class SessionManager {
 
         case SessionStage.POST_PUSH_MESSAGE:
           if (message.toLowerCase() === 'connect x account') {
-            console.log(`[Stage Transition] POST_PUSH -> CONNECT_TWITTER`);
+            console.log(`[Stage Transition] POST_PUSH_MESSAGE -> CONNECT_TWITTER`);
             return {
               newStage: SessionStage.CONNECT_TWITTER,
               response: STAGE_PROMPTS[SessionStage.CONNECT_TWITTER].example_responses[0]
@@ -158,7 +143,6 @@ export class SessionManager {
           break;
 
         case SessionStage.CONNECT_TWITTER:
-          // Handled by TwitterConnect component
           break;
 
         case SessionStage.AUTHENTICATED:
@@ -223,8 +207,6 @@ export class SessionManager {
           
           if (message.toLowerCase() === 'generate code') {
             console.log(`[Stage Transition] Handling generate code command`);
-            // Don't transition stage here - let the route handler do it
-            // Just return null for newStage to let route handler take over
             return {
               response: 'Generating reference code...'
             };
@@ -232,7 +214,6 @@ export class SessionManager {
           
           if (message.toLowerCase().startsWith('submit code ')) {
             console.log(`[Stage Transition] Handling submit code command`);
-            // Same here - let route handler manage the code submission
             return {
               response: 'Processing reference code submission...'
             };
@@ -240,7 +221,6 @@ export class SessionManager {
           break;
 
         case SessionStage.PROTOCOL_COMPLETE:
-          // For PROTOCOL_COMPLETE stage, use GPT for all responses
           console.log(`[Protocol Complete] Free chat enabled for user: ${userId}`);
           const aiResponse = await generateResponse(message, SessionStage.PROTOCOL_COMPLETE);
           return {
@@ -248,7 +228,7 @@ export class SessionManager {
           };
 
         default:
-          // Return default response if no transition
+          console.log(`[Stage Transition] No specific transition for stage ${currentStage}`);
           return {
             response: stagePrompt.example_responses[
               Math.floor(Math.random() * stagePrompt.example_responses.length)
@@ -256,7 +236,7 @@ export class SessionManager {
           };
       }
 
-      // Return default response if no transition matched
+      console.log(`[Stage Transition] No transition matched, using default response`);
       return {
         response: stagePrompt.example_responses[
           Math.floor(Math.random() * stagePrompt.example_responses.length)
@@ -293,6 +273,19 @@ export class SessionManager {
     } catch (error) {
       console.error(`[Session Creation Failed] User: ${userId}, Error:`, error);
       throw new Error('Failed to create session');
+    }
+  }
+
+  static async handleAuthenticationStage(
+    userId: string,
+    stage: SessionStage
+  ): Promise<void> {
+    try {
+      await this.updateSessionStage(userId, stage);
+      console.log(`[Auth Stage Update] User: ${userId}, New Stage: ${stage}`);
+    } catch (error) {
+      console.error(`[Auth Stage Update Failed] User: ${userId}, Error:`, error);
+      throw error;
     }
   }
 } 

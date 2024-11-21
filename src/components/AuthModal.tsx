@@ -21,17 +21,25 @@ export default function AuthModal({ isOpen, onClose, onConnect, onAuthStart }: A
     }
   }, [isOpen]);
 
-  const handleConnect = () => {
-    // Open Twitter auth in new tab
-    onConnect();
-    // Show the auth check modal
-    onAuthStart();
-  };
+  const handleAuthStart = () => {
+    // Calculate center position for popup
+    const width = 600;
+    const height = 600;
+    const left = Math.max(0, (window.innerWidth - width) / 2 + window.screenX);
+    const top = Math.max(0, (window.innerHeight - height) / 2 + window.screenY);
 
-  const handleClose = () => {
-    // Show the auth check modal when closing
-    onAuthStart();
-    onClose();
+    // Open popup in center of screen
+    const popup = window.open(
+      '/api/auth/signin/twitter',
+      'Twitter Auth',
+      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,location=no,status=no`
+    );
+
+    if (popup) {
+      onAuthStart();
+    } else {
+      alert('Please enable popups for authentication');
+    }
   };
 
   if (!isVisible) return null;
@@ -40,45 +48,49 @@ export default function AuthModal({ isOpen, onClose, onConnect, onAuthStart }: A
     <div 
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm
         transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
-      onClick={handleClose}
     >
       <div 
-        className={`bg-black border border-[#FF0000]/20 p-6 rounded-lg shadow-lg max-w-md w-full
-          ancient-terminal transition-all duration-300 
+        className={`bg-black border-2 border-[#FF0000] p-8 rounded-none max-w-md w-full mx-4
+          transform transition-all duration-300 shadow-[0_0_15px_rgba(255,0,0,0.3)]
           ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="text-[#FF0000] text-lg font-['Press_Start_2P'] mb-6 text-center sacred-text">
-          X NETWORK SYNC REQUIRED
+        <div className="border-b-2 border-[#FF0000] pb-4 mb-6">
+          <h2 className="text-[#FF0000] text-2xl font-['Press_Start_2P'] glitch-text text-center">
+            [AUTHENTICATION REQUIRED]
+          </h2>
         </div>
 
         {/* Content */}
-        <div className="text-[#FF0000] mb-6 font-['Courier_New'] space-y-4">
-          <p className="text-center">
-            [INITIATING X NETWORK SYNC]
-            <br />
-            Authorization required to proceed.
+        <div className="space-y-6 mb-8">
+          <p className="text-[#FF0000] font-mono text-lg leading-relaxed tracking-wider text-center">
+            X NETWORK CONNECTION NEEDED
           </p>
-          <div className="border-t border-[#FF0000]/20 my-4" />
-          <p className="text-center text-sm">
-            Click below to open X authorization in a new tab.
+          <p className="text-[#FF0000]/80 font-mono text-center">
+            PROCEED WITH AUTHENTICATION?
           </p>
         </div>
 
         {/* Buttons */}
-        <div className="flex justify-center space-x-4">
+        <div className="flex justify-center space-x-4 pt-4 border-t-2 border-[#FF0000]/20">
           <button
-            onClick={handleConnect}
-            className="retro-button bg-[#FF0000] text-black px-6 py-2 text-sm font-['Press_Start_2P']"
-          >
-            CONNECT X
-          </button>
-          <button
-            onClick={handleClose}
-            className="retro-button bg-black text-[#FF0000] border border-[#FF0000] px-6 py-2 text-sm font-['Press_Start_2P']"
+            onClick={onClose}
+            className="px-6 py-3 border-2 border-[#FF0000] text-[#FF0000] hover:bg-[#FF0000] hover:text-black 
+                     transition-all duration-200 font-mono tracking-wider
+                     focus:outline-none focus:ring-2 focus:ring-[#FF0000] focus:ring-opacity-50
+                     shadow-[0_0_10px_rgba(255,0,0,0.3)]"
           >
             CANCEL
+          </button>
+          <button
+            onClick={handleAuthStart}
+            className="px-6 py-3 bg-[#FF0000] text-black hover:bg-[#CC0000] 
+                     transition-all duration-200 font-mono tracking-wider
+                     focus:outline-none focus:ring-2 focus:ring-[#FF0000] focus:ring-opacity-50
+                     shadow-[0_0_10px_rgba(255,0,0,0.5)]"
+          >
+            CONNECT
           </button>
         </div>
       </div>

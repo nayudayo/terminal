@@ -17,6 +17,12 @@ const getPromptForStage = (stage: SessionStage) => {
 };
 
 export async function generateResponse(prompt: string, stage: SessionStage = SessionStage.PROTOCOL_COMPLETE): Promise<string> {
+  // Check if it's a command first
+  if (isCommand(prompt)) {
+    console.log('[Command Intercepted] Skipping AI response for:', prompt);
+    return 'Command processing...';
+  }
+
   try {
     const { context, example_responses } = getPromptForStage(stage);
 
@@ -26,12 +32,12 @@ export async function generateResponse(prompt: string, stage: SessionStage = Ses
         role: "system",
         content: `${context}\n\nExample responses:\n${example_responses.join('\n')}\n\n
 Format guidelines:
-- Break long sentences into multiple lines
-- Keep each line under 50 characters
-- Maintain the mysterious tone
-- Be concise and clear
+- Break long sentences into multiple lines (max 40-50 characters per line)
 - Use single line breaks between sentences
-- No headers or separators needed`
+- Maintain cryptic/mysterious tone
+- Be concise and clear
+- No headers or separators needed
+- Start each new thought on a new line`
       }, {
         role: "user",
         content: prompt
@@ -44,18 +50,18 @@ Format guidelines:
 
     const response = completion.choices[0]?.message?.content || 'ERROR: NO RESPONSE GENERATED';
     
-    // Format the response with single line breaks
+    // Format the response with proper line breaks
     const formattedResponse = response
       .split('\n')
       .map(line => {
-        // Break long lines at natural points (around 50 chars)
+        // Break long lines at natural points (around 40-50 chars)
         if (line.length > 60) {
           const words = line.split(' ');
           let currentLine = '';
           const result = [];
           
           words.forEach(word => {
-            if ((currentLine + word).length > 60) {
+            if ((currentLine + word).length > 45) { // Reduced to 45 for better readability
               result.push(currentLine.trim());
               currentLine = word + ' ';
             } else {
@@ -77,7 +83,12 @@ Format guidelines:
       .filter(line => line.length > 0)
       .join('\n');
 
-    return formattedResponse;
+    // Add proper spacing between thoughts
+    const finalResponse = formattedResponse
+      .replace(/([.!?])\s+/g, '$1\n') // Add double line break after sentences
+      .replace(/\n{3,}/g, '\n\n'); // Remove excess line breaks
+
+    return finalResponse;
   } catch (error) {
     console.error('OpenAI API error:', error);
     return 'ERROR: AI SUBSYSTEM MALFUNCTION\nPLEASE TRY AGAIN LATER';
@@ -112,10 +123,15 @@ export function isValidStage(stage: number): boolean {
   return Object.values(SessionStage).includes(stage);
 }
 
-// Helper function to check if message is a command
+// Update the command checking to be more strict and prioritized
 export function isCommand(message: string): boolean {
+  // Normalize message for comparison
+  const normalizedMessage = message.toLowerCase().trim();
+
+  // Exact match commands (prioritized)
   const exactCommands = [
-    'help',
+    'push',
+    'connect x account',
     'mandates',
     'skip mandates',
     'follow ptb',
@@ -131,22 +147,28 @@ export function isCommand(message: string): boolean {
     'generate code',
     'show referral code'
   ];
-  
-  // Convert message to lowercase for comparison
-  const lowerMessage = message.toLowerCase();
-  
+
   // Check exact matches first
-  if (exactCommands.includes(lowerMessage)) {
+  if (exactCommands.includes(normalizedMessage)) {
+    console.log('[Command Detected] Exact match:', normalizedMessage);
     return true;
   }
-  
-  // Check prefix matches
+
+  // Prefix-based commands that need additional validation
   const prefixCommands = [
-    'submit code ',
-    'wallet ',
-    'verify '
+    { prefix: 'submit code', minLength: 12 }, // submit code + space + actual code
+    { prefix: 'wallet', minLength: 10 },      // wallet + space + addresses
+    { prefix: 'verify', minLength: 7 }        // verify + space + code
   ];
-  
-  // Check if message starts with any of the prefix commands
-  return prefixCommands.some(cmd => lowerMessage.startsWith(cmd));
+
+  // Check prefix commands
+  for (const { prefix, minLength } of prefixCommands) {
+    if (normalizedMessage.startsWith(prefix) && normalizedMessage.length >= minLength) {
+      console.log('[Command Detected] Prefix match:', prefix);
+      return true;
+    }
+  }
+
+  console.log('[Command Check] No command match for:', normalizedMessage);
+  return false;
 }

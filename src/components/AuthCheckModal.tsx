@@ -14,11 +14,16 @@ export default function AuthCheckModal({ isOpen, onAuthConfirmed, onRetryAuth }:
   const [error, setError] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [scanLine, setScanLine] = useState(0);
 
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
-      setError(null);
+      // Start scan line animation
+      const interval = setInterval(() => {
+        setScanLine(prev => (prev + 1) % 100);
+      }, 50);
+      return () => clearInterval(interval);
     } else {
       const timer = setTimeout(() => setIsVisible(false), 300);
       return () => clearTimeout(timer);
@@ -35,7 +40,6 @@ export default function AuthCheckModal({ isOpen, onAuthConfirmed, onRetryAuth }:
         return;
       }
 
-      // Verify the session is valid
       const response = await fetch('/api/auth/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45,7 +49,6 @@ export default function AuthCheckModal({ isOpen, onAuthConfirmed, onRetryAuth }:
         throw new Error('Authentication verification failed');
       }
 
-      // Retrigger connect x account command via API to show AUTHENTICATED message
       const chatResponse = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,10 +62,8 @@ export default function AuthCheckModal({ isOpen, onAuthConfirmed, onRetryAuth }:
         throw new Error('Failed to complete authentication flow');
       }
 
-      // Get the authenticated message from the response
       const data = await chatResponse.json();
       
-      // Dispatch authenticated message event
       window.dispatchEvent(
         new CustomEvent('CHAT_MESSAGE', {
           detail: {
@@ -73,7 +74,6 @@ export default function AuthCheckModal({ isOpen, onAuthConfirmed, onRetryAuth }:
         })
       );
 
-      // Close modal
       onAuthConfirmed();
 
     } catch (error) {
@@ -94,61 +94,111 @@ export default function AuthCheckModal({ isOpen, onAuthConfirmed, onRetryAuth }:
 
   return (
     <div 
-      className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm
         transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
     >
       <div 
-        className={`bg-black border-2 border-[#FF0000] p-4 sm:p-8 rounded-none w-full max-w-[90vw] sm:max-w-md mx-2 sm:mx-4
-          transform transition-all duration-300 shadow-[0_0_15px_rgba(255,0,0,0.3)]
+        className={`relative bg-black/95 w-full max-w-md mx-4
+          transform transition-all duration-300 
+          shadow-[0_0_50px_rgba(153,27,27,0.3)]
+          animate-pulse-slow
           ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
       >
-        <div className="border-b-2 border-[#FF0000] pb-3 sm:pb-4 mb-4 sm:mb-6">
-          <h2 className="text-[#FF0000] text-lg sm:text-2xl font-['Press_Start_2P'] glitch-text text-center">
-            [AUTHENTICATION IN PROGRESS]
-          </h2>
+        {/* Scan Line Effect */}
+        <div 
+          className="absolute inset-0 pointer-events-none overflow-hidden"
+          style={{
+            background: `linear-gradient(transparent ${scanLine}%, rgba(153,27,27,0.15) ${scanLine + 0.5}%, transparent ${scanLine + 1}%)`
+          }}
+        />
+
+        {/* Glitch Effect Container */}
+        <div className="absolute inset-0 glitch-container">
+          <div className="absolute inset-0 border-2 border-red-800/70 
+                         shadow-[inset_0_0_20px_rgba(153,27,27,0.4)]
+                         animate-glitch-1" />
+          <div className="absolute inset-0 border border-red-900/50 m-[2px] 
+                         shadow-[0_0_15px_rgba(153,27,27,0.3)]
+                         animate-glitch-2" />
+          <div className="absolute inset-0 border border-red-950/30 m-[4px]
+                         animate-glitch-3" />
         </div>
 
-        <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
-          <p className="text-[#FF0000] font-mono text-base sm:text-lg leading-relaxed tracking-wider text-center">
-            COMPLETE THE AUTHENTICATION IN
-            THE POPUP WINDOW
-          </p>
-          <p className="text-[#FF0000]/80 font-mono text-sm sm:text-base text-center">
-            CLICK CONFIRM WHEN COMPLETE
-          </p>
-          
-          {error && (
-            <div className="bg-[#FF0000]/10 border-2 border-[#FF0000] p-3 sm:p-4 mt-4">
-              <p className="text-[#FF0000] font-mono text-xs sm:text-sm text-center mb-3 sm:mb-4">
-                {error}
-              </p>
-              <div className="flex justify-center">
+        {/* Content Container */}
+        <div className="relative p-6 space-y-6">
+          {/* Header with Flicker Effect */}
+          <div className="space-y-2 animate-flicker">
+            <h2 className="text-lg font-['IBM_Plex_Mono'] tracking-[0.2em] text-red-800 text-center font-bold uppercase
+                         drop-shadow-[0_0_10px_rgba(153,27,27,0.6)]
+                         drop-shadow-[0_0_20px_rgba(153,27,27,0.4)]
+                         text-shadow-[0_0_10px_rgba(220,38,38,0.8)]
+                         hover:animate-glitch-text">
+              [AUTHENTICATION SEQUENCE]
+            </h2>
+            <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-red-800/80 to-transparent
+                          shadow-[0_0_15px_rgba(153,27,27,0.5)]" />
+          </div>
+
+          {/* Status Message */}
+          <div className="space-y-4 py-4">
+            <p className="text-sm font-['IBM_Plex_Mono'] text-red-700 text-center leading-relaxed tracking-wider
+                       drop-shadow-[0_0_8px_rgba(153,27,27,0.5)]
+                       drop-shadow-[0_0_16px_rgba(153,27,27,0.3)]
+                       text-shadow-[0_0_8px_rgba(220,38,38,0.6)]
+                       animate-typing">
+              AWAITING X NETWORK CONFIRMATION
+              <br />
+              COMPLETE AUTHENTICATION IN POPUP
+            </p>
+            
+            {error && (
+              <div className="mt-4 p-4 border-2 border-red-800/50 bg-red-950/20
+                           shadow-[inset_0_0_20px_rgba(153,27,27,0.2)]">
+                <p className="text-xs font-['IBM_Plex_Mono'] text-red-600 text-center tracking-wider
+                           drop-shadow-[0_0_8px_rgba(153,27,27,0.4)]
+                           drop-shadow-[0_0_16px_rgba(153,27,27,0.3)]
+                           text-shadow-[0_0_8px_rgba(220,38,38,0.6)]">
+                  {error}
+                </p>
                 <button
                   onClick={handleRetry}
-                  className="px-3 sm:px-4 py-2 bg-[#FF0000]/20 text-[#FF0000] hover:bg-[#FF0000]/30 
-                           transition-all duration-200 font-mono text-xs sm:text-sm tracking-wider
-                           focus:outline-none focus:ring-2 focus:ring-[#FF0000] focus:ring-opacity-50"
+                  className="mt-3 w-full px-3 py-2 bg-black border-2 border-red-800/70 text-red-800
+                           hover:bg-red-950/40 hover:text-red-700 transition-all duration-200 
+                           font-['IBM_Plex_Mono'] text-xs tracking-[0.2em]
+                           shadow-[0_0_20px_rgba(153,27,27,0.3)]
+                           hover:shadow-[0_0_25px_rgba(153,27,27,0.4)]
+                           relative overflow-hidden"
                 >
-                  RETRY AUTHENTICATION
+                  <span className="relative z-10">[RETRY SEQUENCE]</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
+                                transform translate-x-[-100%] group-hover:translate-x-[100%]
+                                transition-transform duration-1000" />
                 </button>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div className="flex justify-center pt-3 sm:pt-4 border-t-2 border-[#FF0000]/20">
-          <button
-            onClick={handleConfirm}
-            disabled={isChecking || !!error}
-            className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-[#FF0000] text-black hover:bg-[#CC0000] 
-                     transition-all duration-200 font-mono text-sm sm:text-base tracking-wider
-                     focus:outline-none focus:ring-2 focus:ring-[#FF0000] focus:ring-opacity-50
-                     shadow-[0_0_10px_rgba(255,0,0,0.5)]
-                     disabled:opacity-50 disabled:cursor-not-allowed
-                     min-w-[120px] sm:min-w-[150px]"
-          >
-            {isChecking ? 'CHECKING...' : 'CONFIRM'}
-          </button>
+          {/* Action Button */}
+          <div className="pt-4 border-t border-red-800/50">
+            <button
+              onClick={handleConfirm}
+              disabled={isChecking || !!error}
+              className="group w-full px-4 py-3 bg-red-950/40 border-2 border-red-800/70 text-red-800
+                       hover:bg-red-900/50 hover:border-red-700/80 hover:text-red-700
+                       transition-all duration-200 font-['IBM_Plex_Mono'] text-sm tracking-[0.2em]
+                       disabled:opacity-50 disabled:cursor-not-allowed
+                       shadow-[0_0_20px_rgba(153,27,27,0.3)]
+                       hover:shadow-[0_0_25px_rgba(153,27,27,0.4)]
+                       relative overflow-hidden"
+            >
+              <span className="relative z-10">
+                {isChecking ? '[VERIFYING...]' : '[CONFIRM AUTH]'}
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
+                            transform translate-x-[-100%] group-hover:translate-x-[100%]
+                            transition-transform duration-1000" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

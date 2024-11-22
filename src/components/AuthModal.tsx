@@ -11,10 +11,16 @@ interface AuthModalProps {
 
 export default function AuthModal({ isOpen, onClose, onConnect, onAuthStart }: AuthModalProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const [scanLine, setScanLine] = useState(0);
 
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
+      // Start scan line animation
+      const interval = setInterval(() => {
+        setScanLine(prev => (prev + 1) % 100);
+      }, 50);
+      return () => clearInterval(interval);
     } else {
       const timer = setTimeout(() => setIsVisible(false), 300);
       return () => clearTimeout(timer);
@@ -22,13 +28,11 @@ export default function AuthModal({ isOpen, onClose, onConnect, onAuthStart }: A
   }, [isOpen]);
 
   const handleAuthStart = () => {
-    // Calculate center position for popup
     const width = 600;
     const height = 600;
     const left = Math.max(0, (window.innerWidth - width) / 2 + window.screenX);
     const top = Math.max(0, (window.innerHeight - height) / 2 + window.screenY);
 
-    // Open popup in center of screen
     const popup = window.open(
       '/api/auth/signin/twitter',
       'Twitter Auth',
@@ -46,52 +50,103 @@ export default function AuthModal({ isOpen, onClose, onConnect, onAuthStart }: A
 
   return (
     <div 
-      className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm
         transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
     >
       <div 
-        className={`bg-black border-2 border-[#FF0000] p-4 sm:p-8 rounded-none w-full max-w-[90vw] sm:max-w-md mx-2 sm:mx-4
-          transform transition-all duration-300 shadow-[0_0_15px_rgba(255,0,0,0.3)]
+        className={`relative bg-black/95 w-full max-w-md mx-4
+          transform transition-all duration-300 
+          shadow-[0_0_50px_rgba(153,27,27,0.3)]
+          animate-pulse-slow
           ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="border-b-2 border-[#FF0000] pb-3 sm:pb-4 mb-4 sm:mb-6">
-          <h2 className="text-[#FF0000] text-lg sm:text-2xl font-['Press_Start_2P'] glitch-text text-center">
-            [AUTHENTICATION REQUIRED]
-          </h2>
+        {/* Scan Line Effect */}
+        <div 
+          className="absolute inset-0 pointer-events-none overflow-hidden"
+          style={{
+            background: `linear-gradient(transparent ${scanLine}%, rgba(153,27,27,0.15) ${scanLine + 0.5}%, transparent ${scanLine + 1}%)`
+          }}
+        />
+
+        {/* Glitch Effect Container */}
+        <div className="absolute inset-0 glitch-container">
+          <div className="absolute inset-0 border-2 border-red-800/70 
+                         shadow-[inset_0_0_20px_rgba(153,27,27,0.4)]
+                         animate-glitch-1" />
+          <div className="absolute inset-0 border border-red-900/50 m-[2px] 
+                         shadow-[0_0_15px_rgba(153,27,27,0.3)]
+                         animate-glitch-2" />
+          <div className="absolute inset-0 border border-red-950/30 m-[4px]
+                         animate-glitch-3" />
         </div>
 
-        {/* Content */}
-        <div className="space-y-4 sm:space-y-6 mb-6 sm:mb-8">
-          <p className="text-[#FF0000] font-mono text-base sm:text-lg leading-relaxed tracking-wider text-center">
-            X NETWORK CONNECTION NEEDED
-          </p>
-          <p className="text-[#FF0000]/80 font-mono text-sm sm:text-base text-center">
-            PROCEED WITH AUTHENTICATION?
-          </p>
-        </div>
+        {/* Content Container */}
+        <div className="relative p-6 space-y-6">
+          {/* Header with Flicker Effect */}
+          <div className="space-y-2 animate-flicker">
+            <h2 className="text-lg font-['IBM_Plex_Mono'] tracking-[0.2em] text-red-800 text-center font-bold uppercase
+                         drop-shadow-[0_0_10px_rgba(153,27,27,0.6)]
+                         drop-shadow-[0_0_20px_rgba(153,27,27,0.4)]
+                         text-shadow-[0_0_10px_rgba(220,38,38,0.8)]
+                         hover:animate-glitch-text">
+              [AUTHENTICATION REQUIRED]
+            </h2>
+            <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-red-800/80 to-transparent
+                          shadow-[0_0_15px_rgba(153,27,27,0.5)]" />
+          </div>
 
-        {/* Buttons */}
-        <div className="flex justify-center space-x-3 sm:space-x-4 pt-3 sm:pt-4 border-t-2 border-[#FF0000]/20">
-          <button
-            onClick={onClose}
-            className="px-4 sm:px-6 py-2 sm:py-3 border-2 border-[#FF0000] text-[#FF0000] hover:bg-[#FF0000] hover:text-black 
-                     transition-all duration-200 font-mono text-sm sm:text-base tracking-wider
-                     focus:outline-none focus:ring-2 focus:ring-[#FF0000] focus:ring-opacity-50
-                     shadow-[0_0_10px_rgba(255,0,0,0.3)]"
-          >
-            CANCEL
-          </button>
-          <button
-            onClick={handleAuthStart}
-            className="px-4 sm:px-6 py-2 sm:py-3 bg-[#FF0000] text-black hover:bg-[#CC0000] 
-                     transition-all duration-200 font-mono text-sm sm:text-base tracking-wider
-                     focus:outline-none focus:ring-2 focus:ring-[#FF0000] focus:ring-opacity-50
-                     shadow-[0_0_10px_rgba(255,0,0,0.5)]"
-          >
-            CONNECT
-          </button>
+          {/* Message with Typing Effect */}
+          <div className="space-y-4 py-4">
+            <p className="text-sm font-['IBM_Plex_Mono'] text-red-700 text-center leading-relaxed tracking-wider
+                       drop-shadow-[0_0_8px_rgba(153,27,27,0.5)]
+                       drop-shadow-[0_0_16px_rgba(153,27,27,0.3)]
+                       text-shadow-[0_0_8px_rgba(220,38,38,0.6)]
+                       animate-typing">
+              SECURE X NETWORK CONNECTION REQUIRED
+              <br />
+              PROCEED WITH AUTHENTICATION PROTOCOL
+            </p>
+            <div className="text-xs font-['IBM_Plex_Mono'] text-red-600 text-center tracking-[0.15em]
+                          drop-shadow-[0_0_6px_rgba(153,27,27,0.4)]
+                          drop-shadow-[0_0_12px_rgba(153,27,27,0.3)]
+                          text-shadow-[0_0_6px_rgba(220,38,38,0.5)]
+                          animate-pulse">
+              WARNING: UNAUTHORIZED ACCESS PROHIBITED
+            </div>
+          </div>
+
+          {/* Actions with Hover Effects */}
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-red-800/50">
+            <button
+              onClick={onClose}
+              className="group px-4 py-2 bg-black border-2 border-red-800/70 text-red-800 
+                       hover:bg-red-950/40 hover:border-red-700/80 hover:text-red-700
+                       transition-all duration-200 font-['IBM_Plex_Mono'] text-sm tracking-[0.2em]
+                       shadow-[0_0_20px_rgba(153,27,27,0.3)]
+                       hover:shadow-[0_0_25px_rgba(153,27,27,0.4)]
+                       relative overflow-hidden"
+            >
+              <span className="relative z-10">[ABORT]</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
+                            transform translate-x-[-100%] group-hover:translate-x-[100%]
+                            transition-transform duration-1000" />
+            </button>
+            <button
+              onClick={handleAuthStart}
+              className="group px-4 py-2 bg-red-950/40 border-2 border-red-800/70 text-red-800
+                       hover:bg-red-900/50 hover:border-red-700/80 hover:text-red-700
+                       transition-all duration-200 font-['IBM_Plex_Mono'] text-sm tracking-[0.2em]
+                       shadow-[0_0_20px_rgba(153,27,27,0.3)]
+                       hover:shadow-[0_0_25px_rgba(153,27,27,0.4)]
+                       relative overflow-hidden"
+            >
+              <span className="relative z-10">[PROCEED]</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
+                            transform translate-x-[-100%] group-hover:translate-x-[100%]
+                            transition-transform duration-1000" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

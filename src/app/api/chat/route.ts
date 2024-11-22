@@ -29,6 +29,7 @@ import {
   verifyWalletTransaction 
 } from '@/lib/walletValidator';
 import { STAGE_PROMPTS } from '@/constants/prompts';
+import { Redis } from 'ioredis';
 
 interface ReferralCode {
   code: string;

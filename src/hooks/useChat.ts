@@ -49,6 +49,8 @@ export function useChat(userId: string) {
     lastUpdated: Date.now()
   });
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
 
 
 useEffect(() => {
@@ -244,24 +246,21 @@ useEffect(() => {
         case 'like ptb':
           newStatus.likeComplete = true;
           break;
-        case 'skip mandates':
-          newStatus.mandatesComplete = true;
-          newStatus.currentStep = 2;
-          break;
         case 'join telegram':
           newStatus.telegramComplete = true;
-          newStatus.currentStep = 3;
+          newStatus.currentStep = 2;
           break;
         case 'verify':
           newStatus.verificationComplete = true;
-          newStatus.currentStep = 4;
+          newStatus.currentStep = 3;
           break;
         case 'submit wallet':
           newStatus.walletComplete = true;
-          newStatus.currentStep = 5;
+          newStatus.currentStep = 4;
           break;
         case 'reference':
           newStatus.referenceComplete = true;
+          newStatus.currentStep = 5;
           break;
       }
       
@@ -270,9 +269,6 @@ useEffect(() => {
   
     // Then update session stage based on command
     switch (command) {
-      case 'skip mandates':
-        await updateSessionStage(SessionStage.MANDATES);
-        break;
       case 'join telegram':
         await updateSessionStage(SessionStage.TELEGRAM_REDIRECT);
         break;
@@ -397,16 +393,11 @@ useEffect(() => {
         // Add a small delay for visual effect
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        // Check if we have a code (either existing or newly generated)
         if (data.code) {
-          // Show the code message first
-          const codeMessage = data.existingCode 
-            ? `[EXISTING CODE RETRIEVED]\n=============================\nYOUR REFERENCE CODE: ${data.code}\n\nThis code was previously generated and can be shared with others.`
-            : `[CODE GENERATED SUCCESSFULLY]\n=============================\nYOUR REFERENCE CODE: ${data.code}\n\nThis code has been saved and can be shared with others.`;
-
+          // Show the code generation success message
           addMessage({
             id: uuidv4(),
-            content: codeMessage,
+            content: `[CODE GENERATED SUCCESSFULLY]\n=============================\nYOUR REFERENCE CODE: ${data.code}\n\nThis code has been saved and can be shared with others.`,
             role: 'assistant',
             timestamp: Date.now(),
           });
@@ -421,28 +412,25 @@ useEffect(() => {
             })
           );
 
-          // Add a delay before showing completion message
+          // Add a delay before showing completion message and updating stage
           await new Promise(resolve => setTimeout(resolve, 2000));
           
-          // Then show the completion message
-          if (data.message) {
-            addMessage({
-              id: uuidv4(),
-              content: data.message,
-              role: 'assistant',
-              timestamp: Date.now(),
-            });
-          }
+          // Show the protocol complete message
+          addMessage({
+            id: uuidv4(),
+            content: PROTOCOL_COMPLETE_MESSAGE,
+            role: 'assistant',
+            timestamp: Date.now(),
+          });
 
           // Only update the stage after showing all messages
           if (data.newStage) {
             await updateSessionStage(data.newStage);
           }
         } else {
-          // Handle case where no code was returned
           addMessage({
             id: uuidv4(),
-            content: 'ERROR: No reference code was generated. Please try again.',
+            content: 'ERROR: Failed to generate reference code. Please try again.',
             role: 'assistant',
             timestamp: Date.now(),
           });
@@ -951,6 +939,73 @@ STATUS: VERIFIED ✓
     setShowAuthModal(false);
   }, []);
 
+  const generateReferralCode = async (twitterId: string) => {
+    try {
+      setIsLoading(true);
+      console.log('[Generating Code] Attempting for Twitter ID:', twitterId);
+      
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: 'generate code',
+          twitterId 
+        }),
+      });
+
+      const data = await response.json();
+      console.log('[Generate Code Response]', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate code');
+      }
+
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+
+      // Handle both new and existing codes
+      if (data.code) {
+        setReferralCode(data.code);
+        
+        // Add success message to chat
+        addMessage({
+          id: uuidv4(),
+          role: 'assistant',
+          content: `[REFERENCE CODE ${data.isExisting ? 'RETRIEVED' : 'GENERATED'}]
+=============================
+YOUR REFERENCE CODE: ${data.code}
+
+This code has been saved and can be shared with others.`,
+          timestamp: Date.now(),
+        });
+
+        // Update session stage if needed
+        if (data.newStage) {
+          await updateSessionStage(data.newStage);
+        }
+      } else {
+        throw new Error('No code received in response');
+      }
+
+    } catch (error) {
+      console.error('[Generate Code Error]:', error);
+      addMessage({
+        id: uuidv4(),
+        role: 'assistant',
+        content: `[SYSTEM ERROR]
+=============================
+Failed to process reference code request.
+Please try again or contact support.`,
+        timestamp: Date.now(),
+      });
+      setError('Failed to generate referral code');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     messages,
     input,
@@ -976,5 +1031,8 @@ STATUS: VERIFIED ✓
     showAuthModal,
     setShowAuthModal,
     handleAuthConnect,
+    generateReferralCode,
+    error,
+    referralCode,
   };
 }

@@ -501,35 +501,41 @@ Please try again later.`
         });
       }
 
-      const currentSession = await SessionManager.getSession(session.user.id);
-      console.log('[API] Current session stage:', currentSession?.stage);
-      
-      if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS
-        });
-      }
-
       try {
+        // First check if user is at the correct stage
+        const currentSession = await SessionManager.getSession(session.user.id);
+        console.log('[API] Current session stage:', currentSession?.stage);
+        
+        if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
+          return NextResponse.json({
+            message: ERROR_MESSAGES.PREVIOUS_STEPS
+          });
+        }
+
         const db = await initDb();
+        
+        // Check for existing code first
+        console.log('[API] Checking for existing code for user:', session.user.id);
         const existingCode = await db.prepare(
           'SELECT code FROM referral_codes WHERE twitter_id = ?'
-        ).get(session.user.id) as ReferralCode | undefined;
+        ).get(session.user.id) as Pick<ReferralCode, 'code'> | undefined;
 
         if (existingCode) {
           console.log('[API] Found existing code:', existingCode.code);
           await SessionManager.updateSessionStage(session.user.id, SessionStage.PROTOCOL_COMPLETE);
+          
           return NextResponse.json({ 
             message: SUCCESS_MESSAGES.REFERENCE_CODE_EXISTS(existingCode.code),
             commandComplete: true,
             shouldAutoScroll: true,
             newStage: SessionStage.PROTOCOL_COMPLETE,
             dispatchEvent: 'CODE_GENERATED',
-            code: existingCode.code  // Make sure we're sending the code
+            code: existingCode.code,
+            isExisting: true
           });
         }
 
-        // Generate new code
+        // Generate new code if none exists
         console.log('[API] Generating new code for user:', session.user.id);
         const code = await generateReferralCode(session.user.id, session.user.name || 'USER');
         console.log('[API] Generated new code:', code);
@@ -542,12 +548,18 @@ Please try again later.`
           shouldAutoScroll: true,
           newStage: SessionStage.PROTOCOL_COMPLETE,
           dispatchEvent: 'CODE_GENERATED',
-          code: code  // Make sure we're sending the code
+          code: code,
+          isExisting: false
         });
       } catch (error) {
         console.error('Error generating reference code:', error);
         return NextResponse.json({
-          message: ERROR_MESSAGES.GENERATE_CODE_FAILED
+          message: `[REFERENCE CODE ERROR]
+=============================
+${error instanceof Error ? error.message : 'Failed to process reference code request.'}
+
+>TYPE "generate code" TO RETRY
+>CONTACT SUPPORT IF ERROR PERSISTS`
         });
       }
     }

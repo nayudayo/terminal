@@ -949,7 +949,8 @@ STATUS: VERIFIED ✓
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: 'generate code',
-          twitterId 
+          twitterId,
+          sessionStage
         }),
       });
 
@@ -957,36 +958,41 @@ STATUS: VERIFIED ✓
       console.log('[Generate Code Response]', data);
 
       if (!response.ok) {
+        console.error('[Response not OK]:', response.status, response.statusText);
         throw new Error(data.error || 'Failed to generate code');
       }
 
-      if (data.error) {
-        setError(data.error);
-        return;
-      }
+      // Always show the message from the API response
+      addMessage({
+        id: uuidv4(),
+        role: 'assistant',
+        content: data.message,
+        timestamp: Date.now(),
+      });
 
-      // Handle both new and existing codes
       if (data.code) {
+        console.log('[Code received]:', data.code);
         setReferralCode(data.code);
         
-        // Add success message to chat
-        addMessage({
-          id: uuidv4(),
-          role: 'assistant',
-          content: `[REFERENCE CODE ${data.isExisting ? 'RETRIEVED' : 'GENERATED'}]
-=============================
-YOUR REFERENCE CODE: ${data.code}
-
-This code has been saved and can be shared with others.`,
-          timestamp: Date.now(),
-        });
-
         // Update session stage if needed
         if (data.newStage) {
           await updateSessionStage(data.newStage);
         }
+
+        // Dispatch event if needed
+        if (data.dispatchEvent) {
+          window.dispatchEvent(
+            new CustomEvent('CHAT_MESSAGE', {
+              detail: {
+                type: data.dispatchEvent,
+                code: data.code
+              }
+            })
+          );
+        }
       } else {
-        throw new Error('No code received in response');
+        console.error('[No code in response]:', data);
+        throw new Error('No code in response');
       }
 
     } catch (error) {
@@ -994,10 +1000,17 @@ This code has been saved and can be shared with others.`,
       addMessage({
         id: uuidv4(),
         role: 'assistant',
-        content: `[SYSTEM ERROR]
+        content: `[SYSTEM DIAGNOSTIC]
 =============================
-Failed to process reference code request.
-Please try again or contact support.`,
+REFERENCE CODE GENERATION FAILED
+DIAGNOSTIC REPORT:
+- ERROR TYPE: ${error instanceof Error ? error.name : 'Unknown'}
+- ERROR CODE: ${error instanceof Error ? error.message : 'Unspecified'}
+- TIMESTAMP: ${new Date().toISOString()}
+
+RECOMMENDED ACTION:
+>TYPE "generate code" TO RETRY
+>CONTACT SUPPORT IF ERROR PERSISTS`,
         timestamp: Date.now(),
       });
       setError('Failed to generate referral code');
@@ -1005,6 +1018,50 @@ Please try again or contact support.`,
       setIsLoading(false);
     }
   };
+
+  // Add a new function to check for existing code
+  const checkExistingCode = async (twitterId: string) => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: 'show referral code',
+          twitterId 
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.code) {
+        setReferralCode(data.code);
+        addMessage({
+          id: uuidv4(),
+          role: 'assistant',
+          content: `[REFERENCE CODE FOUND]
+=============================
+YOUR EXISTING CODE: ${data.code}
+
+This code can be shared with others.
+Type "help" to see available commands.`,
+          timestamp: Date.now(),
+        });
+        
+        if (data.newStage) {
+          await updateSessionStage(data.newStage);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking existing code:', error);
+    }
+  };
+
+  // Add effect to check for existing code when reaching stage 9
+  useEffect(() => {
+    if (sessionStage === SessionStage.REFERENCE_CODE && session?.user?.id) {
+      checkExistingCode(session.user.id);
+    }
+  }, [sessionStage, session?.user?.id]);
 
   return {
     messages,

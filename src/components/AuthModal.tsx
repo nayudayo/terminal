@@ -12,11 +12,12 @@ interface AuthModalProps {
 export default function AuthModal({ isOpen, onClose, onConnect, onAuthStart }: AuthModalProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [scanLine, setScanLine] = useState(0);
+  const [showAbortMessage, setShowAbortMessage] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
-      // Start scan line animation
+      setShowAbortMessage(false);
       const interval = setInterval(() => {
         setScanLine(prev => (prev + 1) % 100);
       }, 50);
@@ -44,6 +45,14 @@ export default function AuthModal({ isOpen, onClose, onConnect, onAuthStart }: A
     } else {
       alert('Please enable popups for authentication');
     }
+  };
+
+  const handleAbort = () => {
+    setShowAbortMessage(true);
+    // Re-prompt after 3 seconds
+    setTimeout(() => {
+      setShowAbortMessage(false);
+    }, 3000);
   };
 
   if (!isVisible) return null;
@@ -83,70 +92,99 @@ export default function AuthModal({ isOpen, onClose, onConnect, onAuthStart }: A
 
         {/* Content Container */}
         <div className="relative p-6 space-y-6">
-          {/* Header with Flicker Effect */}
-          <div className="space-y-2 animate-flicker">
-            <h2 className="text-lg font-['IBM_Plex_Mono'] tracking-[0.2em] text-red-800 text-center font-bold uppercase
-                         drop-shadow-[0_0_10px_rgba(153,27,27,0.6)]
-                         drop-shadow-[0_0_20px_rgba(153,27,27,0.4)]
-                         text-shadow-[0_0_10px_rgba(220,38,38,0.8)]
-                         hover:animate-glitch-text">
-              [AUTHENTICATION REQUIRED]
-            </h2>
-            <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-red-800/80 to-transparent
-                          shadow-[0_0_15px_rgba(153,27,27,0.5)]" />
-          </div>
+          {showAbortMessage ? (
+            <>
+              <div className="space-y-2 animate-flicker">
+                <h2 className="text-lg font-['IBM_Plex_Mono'] tracking-[0.2em] text-red-800 text-center font-bold uppercase
+                             drop-shadow-[0_0_10px_rgba(153,27,27,0.6)]
+                             drop-shadow-[0_0_20px_rgba(153,27,27,0.4)]
+                             text-shadow-[0_0_10px_rgba(220,38,38,0.8)]">
+                  [ACCESS DENIED]
+                </h2>
+                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-red-800/80 to-transparent
+                              shadow-[0_0_15px_rgba(153,27,27,0.5)]" />
+              </div>
 
-          {/* Message with Typing Effect */}
-          <div className="space-y-4 py-4">
-            <p className="text-sm font-['IBM_Plex_Mono'] text-red-700 text-center leading-relaxed tracking-wider
-                       drop-shadow-[0_0_8px_rgba(153,27,27,0.5)]
-                       drop-shadow-[0_0_16px_rgba(153,27,27,0.3)]
-                       text-shadow-[0_0_8px_rgba(220,38,38,0.6)]
-                       animate-typing">
-              SECURE X NETWORK CONNECTION REQUIRED
-              <br />
-              PROCEED WITH AUTHENTICATION PROTOCOL
-            </p>
-            <div className="text-xs font-['IBM_Plex_Mono'] text-red-600 text-center tracking-[0.15em]
-                          drop-shadow-[0_0_6px_rgba(153,27,27,0.4)]
-                          drop-shadow-[0_0_12px_rgba(153,27,27,0.3)]
-                          text-shadow-[0_0_6px_rgba(220,38,38,0.5)]
-                          animate-pulse">
-              WARNING: UNAUTHORIZED ACCESS PROHIBITED
-            </div>
-          </div>
+              <div className="space-y-4 py-4">
+                <p className="text-sm font-['IBM_Plex_Mono'] text-red-700 text-center leading-relaxed tracking-wider
+                           drop-shadow-[0_0_8px_rgba(153,27,27,0.5)]
+                           drop-shadow-[0_0_16px_rgba(153,27,27,0.3)]
+                           text-shadow-[0_0_8px_rgba(220,38,38,0.6)]
+                           animate-typing">
+                  AUTHENTICATION SEQUENCE ABORTED
+                  <br />
+                  REATTEMPT REQUIRED FOR ACCESS
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Header with Flicker Effect */}
+              <div className="space-y-2 animate-flicker">
+                <h2 className="text-lg font-['IBM_Plex_Mono'] tracking-[0.2em] text-red-800 text-center font-bold uppercase
+                             drop-shadow-[0_0_10px_rgba(153,27,27,0.6)]
+                             drop-shadow-[0_0_20px_rgba(153,27,27,0.4)]
+                             text-shadow-[0_0_10px_rgba(220,38,38,0.8)]
+                             hover:animate-glitch-text">
+                  [AUTHENTICATION REQUIRED]
+                </h2>
+                <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-red-800/80 to-transparent
+                              shadow-[0_0_15px_rgba(153,27,27,0.5)]" />
+              </div>
 
-          {/* Actions with Hover Effects */}
-          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-red-800/50">
-            <button
-              onClick={onClose}
-              className="group px-4 py-2 bg-black border-2 border-red-800/70 text-red-800 
-                       hover:bg-red-950/40 hover:border-red-700/80 hover:text-red-700
-                       transition-all duration-200 font-['IBM_Plex_Mono'] text-sm tracking-[0.2em]
-                       shadow-[0_0_20px_rgba(153,27,27,0.3)]
-                       hover:shadow-[0_0_25px_rgba(153,27,27,0.4)]
-                       relative overflow-hidden"
-            >
-              <span className="relative z-10">[ABORT]</span>
-              <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
-                            transform translate-x-[-100%] group-hover:translate-x-[100%]
-                            transition-transform duration-1000" />
-            </button>
-            <button
-              onClick={handleAuthStart}
-              className="group px-4 py-2 bg-red-950/40 border-2 border-red-800/70 text-red-800
-                       hover:bg-red-900/50 hover:border-red-700/80 hover:text-red-700
-                       transition-all duration-200 font-['IBM_Plex_Mono'] text-sm tracking-[0.2em]
-                       shadow-[0_0_20px_rgba(153,27,27,0.3)]
-                       hover:shadow-[0_0_25px_rgba(153,27,27,0.4)]
-                       relative overflow-hidden"
-            >
-              <span className="relative z-10">[PROCEED]</span>
-              <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
-                            transform translate-x-[-100%] group-hover:translate-x-[100%]
-                            transition-transform duration-1000" />
-            </button>
-          </div>
+              {/* Message with Typing Effect */}
+              <div className="space-y-4 py-4">
+                <p className="text-sm font-['IBM_Plex_Mono'] text-red-700 text-center leading-relaxed tracking-wider
+                           drop-shadow-[0_0_8px_rgba(153,27,27,0.5)]
+                           drop-shadow-[0_0_16px_rgba(153,27,27,0.3)]
+                           text-shadow-[0_0_8px_rgba(220,38,38,0.6)]
+                           animate-typing">
+                  SECURE X NETWORK CONNECTION REQUIRED
+                  <br />
+                  PROCEED WITH AUTHENTICATION PROTOCOL
+                </p>
+                <div className="text-xs font-['IBM_Plex_Mono'] text-red-600 text-center tracking-[0.15em]
+                              drop-shadow-[0_0_6px_rgba(153,27,27,0.4)]
+                              drop-shadow-[0_0_12px_rgba(153,27,27,0.3)]
+                              text-shadow-[0_0_6px_rgba(220,38,38,0.5)]
+                              animate-pulse">
+                  WARNING: UNAUTHORIZED ACCESS PROHIBITED
+                </div>
+              </div>
+
+              {/* Actions with Hover Effects */}
+              <div className="grid grid-cols-2 gap-3 pt-4 border-t border-red-800/50">
+                <button
+                  onClick={handleAbort}
+                  className="group px-4 py-2 bg-black border-2 border-red-800/70 text-red-800 
+                           hover:bg-red-950/40 hover:border-red-700/80 hover:text-red-700
+                           transition-all duration-200 font-['IBM_Plex_Mono'] text-sm tracking-[0.2em]
+                           shadow-[0_0_20px_rgba(153,27,27,0.3)]
+                           hover:shadow-[0_0_25px_rgba(153,27,27,0.4)]
+                           relative overflow-hidden"
+                >
+                  <span className="relative z-10">[ABORT]</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
+                                transform translate-x-[-100%] group-hover:translate-x-[100%]
+                                transition-transform duration-1000" />
+                </button>
+                <button
+                  onClick={handleAuthStart}
+                  className="group px-4 py-2 bg-red-950/40 border-2 border-red-800/70 text-red-800
+                           hover:bg-red-900/50 hover:border-red-700/80 hover:text-red-700
+                           transition-all duration-200 font-['IBM_Plex_Mono'] text-sm tracking-[0.2em]
+                           shadow-[0_0_20px_rgba(153,27,27,0.3)]
+                           hover:shadow-[0_0_25px_rgba(153,27,27,0.4)]
+                           relative overflow-hidden"
+                >
+                  <span className="relative z-10">[PROCEED]</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
+                                transform translate-x-[-100%] group-hover:translate-x-[100%]
+                                transition-transform duration-1000" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

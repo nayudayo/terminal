@@ -539,17 +539,12 @@ SYSTEM ACCESS GRANTED
 >INITIALIZATION COMPLETE
 >AWAITING FURTHER INSTRUCTIONS...`,
 
-  REFERENCE_CODE_GENERATED: (code: string) => `[REFERENCE CODE GENERATED]
+  REFERENCE_CODE_GENERATED: (code: string) => `[NEW CODE GENERATED]
 =============================
 YOUR REFERENCE CODE: ${code}
 
-[ACQUISITION PROTOCOL COMPLETE]
-==============================
-ALL STEPS VERIFIED
-SYSTEM ACCESS GRANTED
-
->INITIALIZATION COMPLETE
->AWAITING FURTHER INSTRUCTIONS...`
+This code has been saved and can be shared with others.
+Type "help" to see available commands.`
 };
 
 // Add these new protocol response messages
@@ -570,17 +565,12 @@ You haven't generated a reference code yet.
 >TYPE "submit code <CODE>" TO SUBMIT A DIFFERENT CODE
 >TYPE "skip reference" TO BYPASS`,
 
-  REFERENCE_CODE_GENERATED: (code: string) => `[REFERENCE CODE GENERATED]
+  REFERENCE_CODE_GENERATED: (code: string) => `[NEW CODE GENERATED]
 =============================
 YOUR REFERENCE CODE: ${code}
 
-[ACQUISITION PROTOCOL COMPLETE]
-==============================
-ALL STEPS VERIFIED
-SYSTEM ACCESS GRANTED
-
->INITIALIZATION COMPLETE
->AWAITING FURTHER INSTRUCTIONS...`
+This code has been saved and can be shared with others.
+Type "help" to see available commands.`
 };
 
 // Add these new messages to the existing file

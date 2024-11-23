@@ -32,21 +32,8 @@ export default function TwitterConnect({
     
     try {
       if (!session) {
-        // Open in a popup window
-        const width = 600;
-        const height = 600;
-        const left = window.screen.width / 2 - width / 2;
-        const top = window.screen.height / 2 - height / 2;
-
-        const authWindow = window.open(
-          '/api/auth/signin/twitter',
-          'Twitter Auth',
-          `width=${width},height=${height},left=${left},top=${top}`
-        );
-
-        if (!authWindow) {
-          throw new Error('Popup was blocked. Please allow popups and try again.');
-        }
+        // Open in a new tab
+        window.location.href = '/api/auth/signin/twitter';
 
         // Show the auth check modal
         setShowAuthModal(false);

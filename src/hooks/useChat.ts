@@ -944,73 +944,62 @@ STATUS: VERIFIED ✓
       setIsLoading(true);
       console.log('[Generating Code] Attempting for Twitter ID:', twitterId);
       
-      const response = await fetch('/api/chat', {
+      // Forward to dedicated generation endpoint instead of chat route
+      const response = await fetch('/api/referral/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: 'generate code',
-          twitterId,
-          sessionStage
+          userId: twitterId,
+          userName: session?.user?.name || 'USER'
         }),
       });
-
-      const data = await response.json();
+       const data = await response.json();
       console.log('[Generate Code Response]', data);
-
-      if (!response.ok) {
-        console.error('[Response not OK]:', response.status, response.statusText);
+       if (!response.ok) {
         throw new Error(data.error || 'Failed to generate code');
       }
-
-      // Always show the message from the API response
+       // Add the response message to chat
       addMessage({
         id: uuidv4(),
         role: 'assistant',
         content: data.message,
         timestamp: Date.now(),
       });
-
-      if (data.code) {
+       if (data.code) {
         console.log('[Code received]:', data.code);
         setReferralCode(data.code);
         
-        // Update session stage if needed
+        // Update session stage if provided
         if (data.newStage) {
           await updateSessionStage(data.newStage);
         }
-
-        // Dispatch event if needed
-        if (data.dispatchEvent) {
-          window.dispatchEvent(
-            new CustomEvent('CHAT_MESSAGE', {
-              detail: {
-                type: data.dispatchEvent,
-                code: data.code
-              }
-            })
-          );
-        }
+         // Trigger modal display
+        window.dispatchEvent(
+          new CustomEvent('CHAT_MESSAGE', {
+            detail: {
+              type: 'CODE_GENERATED',
+              code: data.code
+            }
+          })
+        );
       } else {
-        console.error('[No code in response]:', data);
         throw new Error('No code in response');
       }
-
-    } catch (error) {
+     } catch (error) {
       console.error('[Generate Code Error]:', error);
       addMessage({
         id: uuidv4(),
         role: 'assistant',
         content: `[SYSTEM DIAGNOSTIC]
-=============================
-REFERENCE CODE GENERATION FAILED
-DIAGNOSTIC REPORT:
-- ERROR TYPE: ${error instanceof Error ? error.name : 'Unknown'}
-- ERROR CODE: ${error instanceof Error ? error.message : 'Unspecified'}
-- TIMESTAMP: ${new Date().toISOString()}
-
-RECOMMENDED ACTION:
->TYPE "generate code" TO RETRY
->CONTACT SUPPORT IF ERROR PERSISTS`,
+   ============================
+   EFERENCE CODE GENERATION FAILED
+   IAGNOSTIC REPORT:
+    ERROR TYPE: ${error instanceof Error ? error.name : 'Unknown'}
+    ERROR CODE: ${error instanceof Error ? error.message : 'Unspecified'}
+    TIMESTAMP: ${new Date().toISOString()}
+   RECOMMENDED ACTION:
+   TYPE "generate code" TO RETRY
+   CONTACT SUPPORT IF ERROR PERSISTS`,
         timestamp: Date.now(),
       });
       setError('Failed to generate referral code');
@@ -1018,32 +1007,25 @@ RECOMMENDED ACTION:
       setIsLoading(false);
     }
   };
-
-  // Add a new function to check for existing code
-  const checkExistingCode = async (twitterId: string) => {
+   // Update the checkExistingCode function to use the referral endpoint
+   const checkExistingCode = async (twitterId: string) => {
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/api/referral/get', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: 'show referral code',
-          twitterId 
-        }),
+        body: JSON.stringify({ userId: twitterId }),
       });
-
-      const data = await response.json();
+       if (!response.ok) {
+        throw new Error('Failed to retrieve code');
+      }
+       const data = await response.json();
       
       if (data.code) {
         setReferralCode(data.code);
         addMessage({
           id: uuidv4(),
           role: 'assistant',
-          content: `[REFERENCE CODE FOUND]
-=============================
-YOUR EXISTING CODE: ${data.code}
-
-This code can be shared with others.
-Type "help" to see available commands.`,
+          content: data.message,
           timestamp: Date.now(),
         });
         
@@ -1052,7 +1034,22 @@ Type "help" to see available commands.`,
         }
       }
     } catch (error) {
-      console.error('Error checking existing code:', error);
+      console.error('[Check Existing Code Error]:', error);
+      addMessage({
+        id: uuidv4(),
+        role: 'assistant',
+        content: `[SYSTEM DIAGNOSTIC]
+   ============================
+   EFERENCE CODE RETRIEVAL FAILED
+   IAGNOSTIC REPORT:
+    ERROR TYPE: ${error instanceof Error ? error.name : 'Unknown'}
+    ERROR CODE: ${error instanceof Error ? error.message : 'Unspecified'}
+    TIMESTAMP: ${new Date().toISOString()}
+   RECOMMENDED ACTION:
+   TYPE "show referral code" TO RETRY
+   CONTACT SUPPORT IF ERROR PERSISTS`,
+        timestamp: Date.now(),
+      });
     }
   };
 
@@ -1061,7 +1058,7 @@ Type "help" to see available commands.`,
     if (sessionStage === SessionStage.REFERENCE_CODE && session?.user?.id) {
       checkExistingCode(session.user.id);
     }
-  }, [sessionStage, session?.user?.id]);
+  }, [sessionStage, session?.user?.id,]);
 
   return {
     messages,
@@ -1092,4 +1089,4 @@ Type "help" to see available commands.`,
     error,
     referralCode,
   };
-}
+} 

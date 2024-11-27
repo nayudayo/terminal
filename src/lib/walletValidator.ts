@@ -1,5 +1,6 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { connect, keyStores } from 'near-api-js';
+import { SHA256 } from 'crypto-js';
 import { WALLET_ERROR_MESSAGES } from '@/constants/messages';
 
 // Interfaces
@@ -9,11 +10,21 @@ interface WalletValidationResult {
   transactionCount?: number;
   solanaWallet?: string;
   nearWallet?: string;
+  solanaHash?: string;
+  nearHash?: string;
 }
 
 interface ParsedWallets {
   solanaAddress: string;
+  solanaHash: string;
   nearAddress: string;
+  nearHash: string;
+}
+
+interface TransactionVerification {
+  isValid: boolean;
+  hash?: string;
+  error?: string;
 }
 
 // Rate limiting
@@ -161,11 +172,13 @@ export async function validateNearAddress(address: string): Promise<WalletValida
 
 export function parseWalletCommand(message: string): ParsedWallets | null {
   const parts = message.split(' ');
-  if (parts.length !== 3) return null;
+  if (parts.length !== 5) return null;
 
   return {
     solanaAddress: parts[1],
-    nearAddress: parts[2]
+    solanaHash: parts[2],
+    nearAddress: parts[3],
+    nearHash: parts[4]
   };
 }
 
@@ -181,5 +194,72 @@ export async function verifyWalletTransaction(address: string, network: 'solana'
   } catch (error) {
     console.error(`${network} transaction verification error:`, error);
     return false;
+  }
+}
+
+export async function verifyTransactionHash(
+  walletAddress: string,
+  providedHash: string,
+  network: 'solana' | 'near'
+): Promise<TransactionVerification> {
+  try {
+    if (network === 'solana') {
+      const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
+      const pubKey = new PublicKey(walletAddress);
+      
+      // Verify the provided hash exists in recent transactions
+      const transactions = await connection.getSignaturesForAddress(pubKey, { limit: 10 });
+      const hashExists = transactions.some(tx => tx.signature === providedHash);
+      
+      if (!hashExists) {
+        return {
+          isValid: false,
+          error: 'Provided transaction hash not found in recent transactions'
+        };
+      }
+
+      return {
+        isValid: true,
+        hash: providedHash
+      };
+
+    } else if (network === 'near') {
+      // Verify NEAR transaction hash
+      const response = await fetch(`${process.env.NEAR_RPC_URL}/tx/${providedHash}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'verification',
+          method: 'tx',
+          params: [providedHash, walletAddress]
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!data.result) {
+        return {
+          isValid: false,
+          error: 'Provided transaction hash not found or invalid'
+        };
+      }
+
+      return {
+        isValid: true,
+        hash: providedHash
+      };
+    }
+
+    return {
+      isValid: false,
+      error: 'Unsupported network'
+    };
+
+  } catch (error) {
+    return {
+      isValid: false,
+      error: error instanceof Error ? error.message : 'Transaction verification failed'
+    };
   }
 } 

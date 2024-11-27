@@ -122,9 +122,9 @@ TWO (2) MANDATES MUST BE FULFILLED:
 2. LIKE MANDATE [PENDING]
    >TYPE "like ptb" TO EXECUTE
 
-BYPASS OPTION:
+/*BYPASS OPTION:
 -------------
->TYPE "skip mandates" TO BYPASS ALL MANDATES
+>TYPE "skip mandates" TO BYPASS ALL MANDATES*/
 
 WARNING: EXACT SYNTAX REQUIRED
 AWAITING USER INPUT...
@@ -139,11 +139,11 @@ STEP [2/5]: TELEGRAM SYNC
 SYNC REQUIREMENTS:
 1. JOIN TELEGRAM GROUP
    >TYPE "join telegram" TO PROCEED
-   >TYPE "skip telegram" TO BYPASS
+   /*>TYPE "skip telegram" TO BYPASS*/
 
-BYPASS OPTION:
+/*BYPASS OPTION:
 -------------
->TYPE "skip telegram" TO BYPASS
+>TYPE "skip telegram" TO BYPASS*/
 
 WARNING: EXACT SYNTAX REQUIRED
 AWAITING USER INPUT...
@@ -158,7 +158,7 @@ STEP [3/5]: VERIFICATION CODE
 VERIFICATION REQUIREMENTS:
 1. ENTER VERIFICATION CODE
    >TYPE "verify <code>" TO PROCEED
-   >TYPE "skip verify" TO BYPASS
+   /*>TYPE "skip verify" TO BYPASS*/
 
 WARNING: EXACT SYNTAX REQUIRED
 AWAITING USER INPUT...
@@ -175,28 +175,39 @@ SUBMISSION REQUIREMENTS:
    - Must have transaction history
    - Both wallets must be valid
    - Both addresses required
+   - Transaction hash verification required
+
+VERIFICATION PROCESS:
+-----------------
+1. Address format validation
+2. Transaction history check
+3. Hash verification protocol
+4. Cross-chain validation
 
 SUPPORTED FORMATS:
 ---------------
 1. SOLANA WALLET
    - Base58-encoded public key
    - Must have transactions
-   Example: 7v91N7iZ9mNicL8WfG6cgSCKyRXydQjLh6UYBWwm6y1Q
+   - Recent tx hash required
+   Example Address: 7v91N7iZ9mNicL8WfG6cgSCKyRXydQjLh6UYBWwm6y1Q
+   Example Hash: 5wHu1qwD4kZ4nfYmGkgV5woGzgpErL2qdyxHyVNXkY3G9
 
 2. NEAR WALLET
    - Format: username.near or username.testnet
    - Must be active account
+   - Recent tx hash required
    Examples: 
-   - alice.near
-   - bob.testnet
+   - Address: alice.near
+   - Hash: HEz78hFV4kgfcfiJyeWKBxwJqpZEUsHXkMpoCRZD6qkm
 
 COMMAND SYNTAX:
 ------------
->wallet <solana-address> <near-address>
+>wallet <solana-address> <solana-tx-hash> <near-address> <near-tx-hash>
 
-BYPASS OPTION:
+/*BYPASS OPTION:
 ------------
->TYPE "skip wallet" TO BYPASS
+>TYPE "skip wallet" TO BYPASS*/
 
 WARNING: EXACT SYNTAX REQUIRED
 AWAITING WALLET SUBMISSION...
@@ -214,7 +225,7 @@ SELECT ACTION:
 
 2. SUBMIT EXISTING CODE
    >TYPE "submit code <CODE>" TO VERIFY
-   >TYPE "skip reference" TO BYPASS
+   /*>TYPE "skip reference" TO BYPASS*/
 
 WARNING: EXACT SYNTAX REQUIRED
 AWAITING USER INPUT...
@@ -291,7 +302,10 @@ export const WALLET_ERROR_MESSAGES = {
     LENGTH: 'Solana address must be between 32-44 characters long',
     CHARACTERS: 'Solana address can only contain base58 characters (alphanumeric, no 0, O, I, l)',
     FORMAT: 'Invalid Solana wallet format. Example: 7v91N7iZ9mNicL8WfG6cgSCKyRXydQjLh6UYBWwm6y1Q',
-    NO_TRANSACTIONS: 'No transactions found. Please use a wallet with transaction history.'
+    NO_TRANSACTIONS: 'No transactions found. Please use a wallet with transaction history.',
+    HASH_VERIFICATION: 'Transaction hash verification failed. Please ensure recent transaction history exists.',
+    HASH_NOT_FOUND: 'Provided Solana transaction hash not found in recent transactions',
+    INVALID_HASH: 'Invalid Solana transaction hash format'
   },
   NEAR: {
     ENDING: 'NEAR address must end with .near or .testnet',
@@ -300,14 +314,20 @@ export const WALLET_ERROR_MESSAGES = {
     HYPHEN: 'NEAR username cannot start or end with a hyphen, and cannot have consecutive hyphens',
     FORMAT: 'Invalid NEAR wallet format. Examples:\n- alice.near\n- bob.testnet\n- my-wallet-123.near',
     NO_TRANSACTIONS: 'No transactions found. Please use a wallet with transaction history.',
-    NOT_FOUND: 'NEAR account not found or invalid'
+    NOT_FOUND: 'NEAR account not found or invalid',
+    HASH_VERIFICATION: 'Transaction hash verification failed. Please ensure recent transaction history exists.',
+    HASH_NOT_FOUND: 'Provided NEAR transaction hash not found or invalid',
+    INVALID_HASH: 'Invalid NEAR transaction hash format'
   },
   GENERAL: {
     INVALID: 'Please enter valid Solana and NEAR wallet addresses',
     RATE_LIMIT: 'Too many attempts. Please try again in a few minutes.',
     NETWORK_ERROR: 'Network error while verifying wallets. Please try again.',
     VERIFICATION_FAILED: 'Wallet verification failed. Please ensure both wallets have transaction history.',
-    SYNTAX: 'Invalid syntax. Use: wallet <solana-address> <near-address>'
+    SYNTAX: 'Invalid syntax. Use: wallet <solana-address> <solana-tx-hash> <near-address> <near-tx-hash>',
+    HASH_MISMATCH: 'Transaction hash verification failed. Please try again.',
+    NO_RECENT_TX: 'No recent transactions found. Please ensure active wallet usage.',
+    MISSING_HASH: 'Transaction hashes are required for both wallets'
   }
 };
 
@@ -598,6 +618,7 @@ export const PROTOCOL_MESSAGES = {
 =============================
 ADDRESS RECORDED
 SUBMISSION VERIFIED
+HASH VERIFICATION SUCCESSFUL
 
 ACQUISITION STATUS UPDATED:
 -------------------------

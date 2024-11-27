@@ -5,9 +5,8 @@ import { generateResponse } from './gptHandler';
 
 export class SessionManager {
   private static readonly KEY_PREFIX = 'session:';
-  private static readonly SESSION_EXPIRY = 24 * 60 * 60;
-
-  static async createInitialSession(): Promise<string> {
+  private static readonly SESSION_EXPIRY = 24 * 60 * 60; // 24 hours
+   static async createInitialSession(): Promise<string> {
     const userId = crypto.randomUUID();
     const session: UserSession = {
       userId,
@@ -30,14 +29,12 @@ export class SessionManager {
       throw new Error('Failed to create session');
     }
   }
-
-  static async getSession(userId: string): Promise<UserSession | null> {
+   static async getSession(userId: string): Promise<UserSession | null> {
     if (!userId) {
       console.error('[Session Retrieval Failed] No userId provided');
       return null;
     }
-
-    try {
+     try {
       const redis = getRedisClient();
       const data = await redis.get(`${this.KEY_PREFIX}${userId}`);
       
@@ -45,15 +42,49 @@ export class SessionManager {
         console.log(`[Session Not Found] User: ${userId}`);
         return null;
       }
-
-      const session = JSON.parse(data);
-      console.log(`[Session Retrieved] User: ${userId}, Stage: ${session.stage}`);
+       const session = JSON.parse(data);
       
+      // Add check for stale session
+      if (Date.now() - session.timestamp > this.SESSION_EXPIRY * 1000) {
+        console.log(`[Stale Session] User: ${userId}, Resetting...`);
+        await this.resetSession(userId);
+        return null;
+      }
+       console.log(`[Session Retrieved] User: ${userId}, Stage: ${session.stage}`);
+      
+      // Refresh session TTL
       await redis.expire(`${this.KEY_PREFIX}${userId}`, this.SESSION_EXPIRY);
       
       return session;
     } catch (error) {
       console.error(`[Session Retrieval Failed] User: ${userId}, Error:`, error);
+      return null;
+    }
+  }
+   // Add new resetSession method
+  static async resetSession(userId: string): Promise<UserSession | null> {
+    try {
+      const redis = getRedisClient();
+      
+      // Delete existing session
+      await redis.del(`${this.KEY_PREFIX}${userId}`);
+      
+      // Create new session at INTRO_MESSAGE stage
+      const session: UserSession = {
+        userId,
+        stage: SessionStage.INTRO_MESSAGE,
+        timestamp: Date.now()
+      };
+       await redis.set(
+        `${this.KEY_PREFIX}${userId}`,
+        JSON.stringify(session),
+        'EX',
+        this.SESSION_EXPIRY
+      );
+       console.log(`[Session Reset] User: ${userId}, New Stage: ${SessionStage.INTRO_MESSAGE}`);
+      return session;
+    } catch (error) {
+      console.error(`[Session Reset Failed] User: ${userId}, Error:`, error);
       return null;
     }
   }

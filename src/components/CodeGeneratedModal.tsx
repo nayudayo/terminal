@@ -11,6 +11,8 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
  const [isVisible, setIsVisible] = useState(false);
  const [scanLine, setScanLine] = useState(0);
  const [hasCopied, setHasCopied] = useState(false);
+ const [pushRating] = useState(() => Math.floor(Math.random() * 100) + 1);
+
   useEffect(() => {
    if (isOpen) {
      setIsVisible(true);
@@ -32,6 +34,24 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
      setHasCopied(true);
    }
  };
+
+  // Get color based on rating intensity
+  const getRatingColor = (rating: number) => {
+    if (rating >= 90) return 'text-[#FF0000]'; // Intense red
+    if (rating >= 70) return 'text-[#FF4500]'; // Orange red
+    if (rating >= 50) return 'text-[#FFA500]'; // Orange
+    if (rating >= 30) return 'text-[#FFD700]'; // Gold
+    return 'text-[#98FB98]'; // Pale green
+  };
+
+  const getRatingSize = (rating: number) => {
+    if (rating >= 90) return 'text-8xl';
+    if (rating >= 70) return 'text-7xl';
+    if (rating >= 50) return 'text-6xl';
+    if (rating >= 30) return 'text-5xl';
+    return 'text-4xl';
+  };
+
   if (!isVisible) return null;
   return (
    <div 
@@ -66,17 +86,21 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
        </div>
         {/* Content Container */}
        <div className="relative p-6 space-y-6">
-         {/* Header with Flicker Effect */}
-         <div className="space-y-2 animate-flicker">
-           <h2 className="text-lg font-['IBM_Plex_Mono'] tracking-[0.2em] text-red-800 text-center font-bold uppercase
-                        drop-shadow-[0_0_10px_rgba(153,27,27,0.6)]
-                        drop-shadow-[0_0_20px_rgba(153,27,27,0.4)]
-                        text-shadow-[0_0_10px_rgba(220,38,38,0.8)]
-                        hover:animate-glitch-text">
-             [CODE GENERATED]
-           </h2>
-           <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-red-800/80 to-transparent
-                         shadow-[0_0_15px_rgba(153,27,27,0.5)]" />
+         {/* PUSH Rating Section */}
+         <div className="space-y-6 py-6 border-b-2 border-red-800/50">
+           <p className="text-lg font-['IBM_Plex_Mono'] text-red-700 text-center leading-relaxed tracking-[0.3em]
+             drop-shadow-[0_0_8px_rgba(153,27,27,0.5)]
+             text-shadow-[0_0_8px_rgba(220,38,38,0.6)]">
+             $PUSH RATING
+           </p>
+           <div className="flex justify-center items-center py-4">
+             <span className={`font-['IBM_Plex_Mono'] ${getRatingSize(pushRating)} ${getRatingColor(pushRating)} 
+               font-bold tracking-wider drop-shadow-[0_0_15px_rgba(153,27,27,0.8)]
+               text-shadow-[0_0_15px_rgba(220,38,38,0.9)]
+               animate-pulse-slow`}>
+               {pushRating}
+             </span>
+           </div>
          </div>
           {/* Code Display */}
          <div className="space-y-4 py-4">

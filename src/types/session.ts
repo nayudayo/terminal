@@ -1,14 +1,14 @@
 export enum SessionStage {
-    INTRO_MESSAGE = 1,
-    POST_PUSH_MESSAGE = 2,
-    CONNECT_TWITTER = 3,
-    AUTHENTICATED = 4,
-    MANDATES = 5,
-    TELEGRAM_REDIRECT = 6,
-    TELEGRAM_CODE = 7,
-    WALLET_SUBMIT = 8,
-    REFERENCE_CODE = 9,
-    PROTOCOL_COMPLETE = 10,
+    INTRO_MESSAGE = 0,
+    POST_PUSH_MESSAGE = 1,
+    CONNECT_TWITTER = 2,
+    AUTHENTICATED = 3,
+    MANDATES = 4,
+    TELEGRAM_REDIRECT = 5,
+    TELEGRAM_CODE = 6,
+    WALLET_SUBMIT = 7,
+    REFERENCE_CODE = 8,
+    PROTOCOL_COMPLETE = 9,
   }
   
   export interface UserSession {

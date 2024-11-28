@@ -109,8 +109,8 @@ async function verifyTelegramCode(encryptedCode: string, userId: string): Promis
   console.log('[Telegram Code Verification] Starting verification process');
   
   try {
-    console.log('[Telegram DB] Connecting to database at /var/www/tg-bot/tg-auth/bot_database.sqlite');
-    const db = new Database('/var/www/tg-bot/tg-auth/bot_database.sqlite', { readonly: true });
+    console.log('[Telegram DB] Connecting to database at S:/Coding/Work/tg-auth/bot_database.sqlite');
+    const db = new Database('S:/Coding/Work/tg-auth/bot_database.sqlite', { readonly: true });
     
     console.log(`[Telegram Code] Checking encrypted code for user: ${userId}`);
     const result = db.prepare(
@@ -382,33 +382,6 @@ ${currentStageMessage}`,
         message: SUCCESS_MESSAGES.TELEGRAM_BYPASSED,
         commandComplete: true,
         shouldAutoScroll: true
-      });
-    }
-
-    // Handle skip verify command
-    if (message.toLowerCase() === 'skip verify') {
-      if (!session) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.SESSION_REQUIRED
-        });
-      }
-
-      const currentSession = await SessionManager.getSession(session.user.id);
-      
-      if (!currentSession || currentSession.stage < SessionStage.TELEGRAM_CODE) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS
-        });
-      }
-
-      // Update to WALLET_SUBMIT stage
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
-      
-      return NextResponse.json({
-        message: SUCCESS_MESSAGES.VERIFICATION_BYPASSED,
-        commandComplete: true,
-        shouldAutoScroll: true,
-        newStage: SessionStage.WALLET_SUBMIT
       });
     }
 
@@ -886,7 +859,7 @@ ${currentStageMessage}`,
       if (currentSession.stage > SessionStage.TELEGRAM_CODE) {
         console.log('[Verify Command] Verification already completed');
         return NextResponse.json({
-          message: ERROR_MESSAGES.VERIFICATION_PHASE_ALREADY_COMPLETED
+          message: WALLET_MESSAGE
         });
       }
 
@@ -911,10 +884,10 @@ ${currentStageMessage}`,
           });
         }
 
+        // Code is valid, proceed to next stage
         console.log('[Verify Command] Code validated successfully');
-        console.log('[Verify Command] Updating session stage to WALLET_SUBMIT');
+        console.log('[Verify Command] Updating stage to WALLET_SUBMIT');
         
-        // Update to WALLET_SUBMIT stage
         await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
         
         console.log('[Verify Command] Verification process complete');
@@ -1072,16 +1045,43 @@ ${currentStageMessage}`,
 
     // Handle join telegram command
     if (message.toLowerCase() === 'join telegram') {
+      console.log('[Join Telegram] Command received');
+      
       if (!session) {
+        console.log('[Join Telegram] No session found');
         return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
+          message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
+      
+      const currentSession = await SessionManager.getSession(session.user.id);
+      console.log('[Join Telegram] Current session:', {
+        userId: session.user.id,
+        currentStage: currentSession?.stage,
+        stageName: SessionStage[currentSession?.stage || 0]
+      });
+      
+      if (!currentSession || currentSession.stage < SessionStage.TELEGRAM_REDIRECT) {
+        console.log('[Join Telegram] Invalid stage:', currentSession?.stage);
+        return NextResponse.json({
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
+        });
+      }
+      
+      console.log('[Join Telegram] Attempting stage update to:', {
+        newStage: SessionStage.TELEGRAM_CODE,
+        stageName: SessionStage[SessionStage.TELEGRAM_CODE]
+      });
+
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
+      
+      console.log('[Join Telegram] Stage update complete, returning response');
       return NextResponse.json({
-        message: PROTOCOL_MESSAGES.TELEGRAM.JOIN_COMPLETE,
+        message: VERIFICATION_MESSAGE,
         commandComplete: true,
-        shouldAutoScroll: true
+        shouldAutoScroll: true,
+        newStage: SessionStage.TELEGRAM_CODE,
+        isTyping: false
       });
     }
 

@@ -94,7 +94,7 @@ export class SessionManager {
     stage: SessionStage, 
     additionalData: Record<string, unknown> = {}
   ): Promise<UserSession> {
-    if (!userId || !stage) {
+    if (!userId || stage === undefined) {
       throw new Error('UserId and stage are required');
     }
 

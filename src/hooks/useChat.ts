@@ -5,7 +5,6 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   AUTHENTICATED_MESSAGE,
   INTRO_MESSAGE,
-  TELEGRAM_REDIRECT_MESSAGE,
   UP_PUSH_RESPONSE_ART,
   POST_PUSH_MESSAGE,
   WALLET_ERROR_MESSAGES,
@@ -91,34 +90,46 @@ useEffect(() => {
 
   const updateSessionStage = useCallback(async (newStage: SessionStage) => {
     try {
-      console.log('Updating session stage to:', newStage);
+      console.log('[useChat] Updating session stage:', {
+        newStage,
+        stageName: SessionStage[newStage],
+        userId,
+        twitterId: session?.user?.id
+      });
       
+      if (!userId || newStage === undefined) {
+        console.error('[useChat] Missing required fields for session update');
+        return;
+      }
+
       const response = await fetch('/api/session/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userId, 
+          twitterId: session?.user?.id,
           stage: newStage 
         })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update session stage');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update session stage');
       }
 
       const data = await response.json();
-      console.log('Session update response:', data);
+      console.log('[useChat] Session update response:', data);
 
       if (data.success && data.session?.stage !== undefined) {
         setSessionStage(data.session.stage);
-        console.log('Session stage updated successfully to:', data.session.stage);
+        console.log('[useChat] Session stage updated successfully to:', data.session.stage);
       } else {
-        console.error('Invalid session update response:', data);
+        console.error('[useChat] Invalid session update response:', data);
       }
     } catch (error) {
-      console.error('Error updating session stage:', error);
+      console.error('[useChat] Error updating session stage:', error);
     }
-  }, [userId]);
+  }, [userId, session?.user?.id]);
 
   // Cache utilities
   const getCachedState = useCallback(async (userId: string): Promise<ChatState | null> => {
@@ -270,7 +281,7 @@ useEffect(() => {
     // Then update session stage based on command
     switch (command) {
       case 'join telegram':
-        await updateSessionStage(SessionStage.TELEGRAM_REDIRECT);
+        await updateSessionStage(SessionStage.TELEGRAM_CODE);
         break;
       case 'verify':
         await updateSessionStage(SessionStage.TELEGRAM_CODE);
@@ -482,7 +493,7 @@ useEffect(() => {
       addMessage({
         id: uuidv4(),
         role: 'assistant',
-        content: TELEGRAM_REDIRECT_MESSAGE,
+        content: VERIFICATION_MESSAGE,
         timestamp: Date.now(),
       });
       setIsLoading(false);

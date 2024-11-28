@@ -2,7 +2,8 @@ import { Session } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/auth';
-import { generateReferralCode, initDb } from '@/lib/db';
+import { initDb } from '@/lib/db';
+import Database from 'better-sqlite3';
 import { 
   HELP_MESSAGE, 
   MANDATES_MESSAGE,
@@ -93,6 +94,54 @@ async function resetSession(userId: string, reason: string): Promise<void> {
   await logStageTransition(userId, 'RESET', SessionStage.INTRO_MESSAGE);
 }
 
+// Add interface for Telegram user record
+interface TelegramUser {
+  user_id: number;
+  username: string;
+  joined_group: boolean;
+  joined_channel: boolean;
+  encrypted_code: string;
+  decrypted_code: string;
+}
+
+// Update the verification function with proper typing
+async function verifyTelegramCode(encryptedCode: string, userId: string): Promise<boolean> {
+  console.log('[Telegram Code Verification] Starting verification process');
+  
+  try {
+    console.log('[Telegram DB] Connecting to database at /var/www/tg-bot/tg-auth/bot_database.sqlite');
+    const db = new Database('/var/www/tg-bot/tg-auth/bot_database.sqlite', { readonly: true });
+    
+    console.log(`[Telegram Code] Checking encrypted code for user: ${userId}`);
+    const result = db.prepare(
+      'SELECT * FROM users WHERE encrypted_code = ?'
+    ).get(encryptedCode) as TelegramUser | undefined;
+
+    db.close();
+    console.log('[Telegram DB] Database connection closed');
+    
+    if (result) {
+      if (result.joined_channel) {
+        console.log('[Telegram Code] Valid encrypted code found and user has joined channel');
+        return true;
+      } else {
+        console.log('[Telegram Code] Valid code but user has not joined channel');
+        return false;
+      }
+    } else {
+      console.log('[Telegram Code] Invalid encrypted code');
+      return false;
+    }
+  } catch (error) {
+    console.error('[Telegram Verification Error]', {
+      error,
+      userId,
+      timestamp: new Date().toISOString()
+    });
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   // Declare these at the top of the function to make them available in catch block
   let session: (Session & { user: { id: string; name: string; email: string; }; accessToken: string; }) | null = null;
@@ -157,13 +206,6 @@ export async function POST(request: Request) {
         console.log('[API] User already authenticated');
         await SessionManager.updateSessionStage(session.user.id, SessionStage.AUTHENTICATED);
         
-        const db = await initDb();
-        await db.prepare(
-          `UPDATE message_tracking 
-           SET connect_x_message_shown = TRUE 
-           WHERE user_id = ?`
-        ).run(session.user.id);
-
         return NextResponse.json({
           message: AUTHENTICATED_MESSAGE.replace('ACCESS: GRANTED', `ACCESS: GRANTED\nUSER: ${session.user.name}`),
           shouldAutoScroll: true,
@@ -656,22 +698,29 @@ Please try again later.`
 
     // Handle reference code commands
     if (message.toLowerCase() === 'generate code') {
-      console.log('[API] Handling generate code command');
+      console.log('[Reference Code] Starting code generation process');
       
       if (!session?.user) {
+        console.log('[Reference Code] No authenticated user found');
         return NextResponse.json({ 
           message: PROTOCOL_MESSAGES.TWITTER_AUTH.MUST_AUTH 
         });
       }
-       try {
+
+      try {
         // Check stage first
+        console.log(`[Reference Code] Checking stage for user: ${session.user.id}`);
         const currentSession = await SessionManager.getSession(session.user.id);
+        
         if (!currentSession || currentSession.stage < SessionStage.REFERENCE_CODE) {
+          console.log('[Reference Code] User not at correct stage:', currentSession?.stage);
           return NextResponse.json({
             message: ERROR_MESSAGES.PREVIOUS_STEPS
           });
         }
-         // Forward to dedicated generation endpoint
+
+        console.log('[Reference Code] Stage validation passed, forwarding to generation endpoint');
+        // Forward to dedicated generation endpoint
         const response = await fetch(new URL('/api/referral/generate', request.url), {
           method: 'POST',
           headers: { 
@@ -683,10 +732,18 @@ Please try again later.`
             userName: session.user.name
           })
         });
-         if (!response.ok) {
+
+        if (!response.ok) {
+          console.error('[Reference Code] Generation endpoint failed:', response.statusText);
           throw new Error(`Generation failed: ${response.statusText}`);
         }
-         const data = await response.json();
+
+        const data = await response.json();
+        console.log('[Reference Code] Code generated successfully:', {
+          userId: session.user.id,
+          isExisting: data.isExisting,
+          code: data.code?.substring(0, 3) + '...' // Log partial code for security
+        });
         
         return NextResponse.json({
           message: data.message,
@@ -697,8 +754,15 @@ Please try again later.`
           code: data.code,
           isExisting: data.isExisting
         });
-       } catch (error) {
-        console.error('[API] Error generating code:', error);
+
+      } catch (error) {
+        console.error('[Reference Code] Generation process failed:', {
+          error,
+          userId: session.user.id,
+          timestamp: new Date().toISOString(),
+          stage: 'generation'
+        });
+        
         return NextResponse.json({
           message: ERROR_MESSAGES.REFERENCE_FAILED,
           error: true
@@ -799,35 +863,80 @@ ${currentStageMessage}`,
     }
 
     // Handle verify command
-    if (message.toLowerCase() === 'verify') {
+    if (message.toLowerCase().startsWith('verify ')) {
+      console.log('[Verify Command] Processing verification request');
+      
       if (!session) {
+        console.log('[Verify Command] No session found, rejecting request');
         return NextResponse.json({
           message: ERROR_MESSAGES.SESSION_REQUIRED
         });
       }
 
       const currentSession = await SessionManager.getSession(session.user.id);
+      console.log('[Verify Command] Current session stage:', currentSession?.stage);
       
-      if (currentSession && currentSession.stage > SessionStage.TELEGRAM_CODE) {
-        const currentStageMessage = getStageMessage(currentSession.stage);
+      if (!currentSession || currentSession.stage < SessionStage.TELEGRAM_CODE) {
+        console.log('[Verify Command] Invalid stage, previous steps required');
         return NextResponse.json({
-          message: `[CURRENT PROTOCOL STAGE]
-=============================
-${currentStageMessage}`,
-          shouldAutoScroll: true
+          message: ERROR_MESSAGES.PREVIOUS_STEPS
         });
       }
 
-      if (currentSession && currentSession.stage > SessionStage.TELEGRAM_CODE) {
+      if (currentSession.stage > SessionStage.TELEGRAM_CODE) {
+        console.log('[Verify Command] Verification already completed');
         return NextResponse.json({
-          message: 'ERROR: VERIFICATION PHASE ALREADY COMPLETED'
+          message: ERROR_MESSAGES.VERIFICATION_PHASE_ALREADY_COMPLETED
         });
       }
 
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
-      return NextResponse.json({
-        message: VERIFICATION_MESSAGE
-      });
+      const code = message.split(' ')[1];
+      console.log('[Verify Command] Extracted code:', code?.substring(0, 3) + '...');
+      
+      if (!code) {
+        console.log('[Verify Command] No code provided');
+        return NextResponse.json({
+          message: ERROR_MESSAGES.INVALID_CODE_FORMAT
+        });
+      }
+
+      try {
+        console.log('[Verify Command] Starting code validation');
+        const isValid = await verifyTelegramCode(code, session.user.id);
+        
+        if (!isValid) {
+          console.log('[Verify Command] Code validation failed');
+          return NextResponse.json({
+            message: ERROR_MESSAGES.INVALID_CODE
+          });
+        }
+
+        console.log('[Verify Command] Code validated successfully');
+        console.log('[Verify Command] Updating session stage to WALLET_SUBMIT');
+        
+        // Update to WALLET_SUBMIT stage
+        await SessionManager.updateSessionStage(session.user.id, SessionStage.WALLET_SUBMIT);
+        
+        console.log('[Verify Command] Verification process complete');
+        return NextResponse.json({
+          message: PROTOCOL_MESSAGES.VERIFICATION.COMPLETE,
+          commandComplete: true,
+          shouldAutoScroll: true,
+          newStage: SessionStage.WALLET_SUBMIT
+        });
+
+      } catch (error) {
+        console.error('[Verify Command] Verification process failed', {
+          error,
+          userId: session.user.id,
+          code: code.substring(0, 3) + '...',
+          timestamp: new Date().toISOString()
+        });
+        
+        return NextResponse.json({
+          message: ERROR_MESSAGES.CODE_SUBMISSION_FAILED
+        });
+      }
     }
 
     // Handle show referral code command
@@ -971,22 +1080,6 @@ ${currentStageMessage}`,
       await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_REDIRECT);
       return NextResponse.json({
         message: PROTOCOL_MESSAGES.TELEGRAM.JOIN_COMPLETE,
-        commandComplete: true,
-        shouldAutoScroll: true
-      });
-    }
-
-    // Handle verify code command
-    if (message.toLowerCase().startsWith('verify ')) {
-      if (!session) {
-        return NextResponse.json({
-          message: 'ERROR: X NETWORK CONNECTION REQUIRED'
-        });
-      }
-      // Add your code verification logic here
-      await SessionManager.updateSessionStage(session.user.id, SessionStage.TELEGRAM_CODE);
-      return NextResponse.json({
-        message: PROTOCOL_MESSAGES.VERIFICATION.COMPLETE,
         commandComplete: true,
         shouldAutoScroll: true
       });

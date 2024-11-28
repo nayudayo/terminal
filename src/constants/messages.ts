@@ -361,7 +361,7 @@ export const ERROR_MESSAGES = {
   REFERENCE_PHASE: 'ERROR: REFERENCE PHASE ALREADY COMPLETED',
   FOLLOW_FAILED: 'ERROR: FOLLOW MANDATE FAILED\nPLEASE TRY AGAIN',
   LIKE_FAILED: 'ERROR: LIKE MANDATE FAILED\nPLEASE TRY AGAIN',
-  INVALID_CODE: 'ERROR: INVALID REFERENCE CODE\nPLEASE TRY AGAIN',
+  INVALID_CODE: '[VERIFICATION ERROR]\n=============================\nInvalid encrypted code or channel not joined.\n\nPlease:\n1. Use the encrypted code from the Telegram bot\n2. Ensure you have joined the channel',
   CODE_USED: 'ERROR: YOU HAVE ALREADY USED A REFERENCE CODE',
   REFERENCE_FAILED: 'ERROR: FAILED TO RETRIEVE REFERENCE CODE\nPLEASE TRY AGAIN',
   SESSION_NOT_FOUND: 'ERROR: SESSION NOT FOUND',
@@ -371,7 +371,7 @@ export const ERROR_MESSAGES = {
   INVALID_REFERENCE_CODE: 'ERROR: INVALID REFERENCE CODE\nPLEASE TRY AGAIN',
   YOU_HAVE_ALREADY_USED_A_REFERENCE_CODE: 'ERROR: YOU HAVE ALREADY USED A REFERENCE CODE',
   CODE_SUBMISSION_FAILED: 'ERROR: CODE SUBMISSION FAILED\nPLEASE TRY AGAIN',
-  INVALID_CODE_FORMAT: 'Invalid code format. Please use: submit code <CODE>',
+  INVALID_CODE_FORMAT: 'Please provide your encrypted code from the Telegram bot.\nUse: verify <encrypted-code>',
   AUTHENTICATION_REQUIRED: 'Must be authenticated to generate code',
   GENERATE_CODE_FAILED: 'ERROR: FAILED TO GENERATE REFERENCE CODE\nPLEASE TRY AGAIN',
   TELEGRAM_PHASE_ALREADY_COMPLETED: 'Telegram protocols have been completed.'
@@ -499,7 +499,7 @@ SYSTEM ACCESS GRANTED
 
   REFERENCE_EXISTS: (code: string) => `[REFERENCE CODE EXISTS]
 =============================
-YOUR REFERENCE CODE: ${code}
+YOUR REFERENCE CODE: <copy>${code}</copy>
 
 [ACQUISITION PROTOCOL COMPLETE]
 ==============================
@@ -561,7 +561,7 @@ SYSTEM ACCESS GRANTED
 
   REFERENCE_CODE_GENERATED: (code: string) => `[NEW CODE GENERATED]
 =============================
-YOUR REFERENCE CODE: ${code}
+YOUR REFERENCE CODE: <copy>${code}</copy>
 
 This code has been saved and can be shared with others.
 Type "help" to see available commands.`
@@ -587,7 +587,7 @@ You haven't generated a reference code yet.
 
   REFERENCE_CODE_GENERATED: (code: string) => `[NEW CODE GENERATED]
 =============================
-YOUR REFERENCE CODE: ${code}
+YOUR REFERENCE CODE: <copy>${code}</copy>
 
 This code has been saved and can be shared with others.
 Type "help" to see available commands.`

@@ -31,8 +31,7 @@ export async function POST(request: Request) {
    }
     return NextResponse.json({
      code,
-     message: SUCCESS_MESSAGES.REFERENCE_CODE_EXISTS(code),
-     newStage: SessionStage.PROTOCOL_COMPLETE
+     message: SUCCESS_MESSAGES.REFERENCE_CODE_EXISTS(code)
    });
   } catch (error) {
    console.error('Error retrieving referral code:', error);

@@ -14,13 +14,13 @@ import {
   VERIFICATION_MESSAGE,
   WALLET_MESSAGE,
   REFERENCE_MESSAGE,
+  PROTOCOL_MESSAGES,
 } from '@/constants/messages';
 import { SessionStage } from '@/types/session';
 import { 
   validateSolanaAddress, 
   validateNearAddress, 
   parseWalletCommand, 
-  verifyWalletTransaction 
 } from '@/lib/walletValidator';
 
 
@@ -287,7 +287,7 @@ useEffect(() => {
         await updateSessionStage(SessionStage.TELEGRAM_CODE);
         break;
       case 'submit wallet':
-        await updateSessionStage(SessionStage.WALLET_SUBMIT);
+        await updateSessionStage(SessionStage.REFERENCE_CODE);
         break;
       case 'reference':
         await updateSessionStage(SessionStage.REFERENCE_CODE);
@@ -548,47 +548,18 @@ useEffect(() => {
           return;
         }
 
-        // Verify transactions if needed
-        const [solanaVerified, nearVerified] = await Promise.all([
-          verifyWalletTransaction(parsedWallets.solanaAddress, 'solana'),
-          verifyWalletTransaction(parsedWallets.nearAddress, 'near')
-        ]);
-
-        if (!solanaVerified || !nearVerified) {
-          addMessage({
-            id: uuidv4(),
-            role: 'assistant',
-            content: `[TRANSACTION VERIFICATION FAILED]
-=============================
-${WALLET_ERROR_MESSAGES.GENERAL.VERIFICATION_FAILED}
-
-Required:
-1. Solana wallet must have transaction history
-2. NEAR wallet must have transaction history
-
-Please ensure both wallets are active and try again.`,
-            timestamp: Date.now(),
-          });
-          setIsLoading(false);
-          setIsTyping(false);
-          return;
-        }
 
         // If valid and verified, proceed with submission
         handleCommandComplete('submit wallet');
+
+          // Then show the protocol stage update message
         addMessage({
           id: uuidv4(),
           role: 'assistant',
-          content: `[WALLET VERIFICATION COMPLETE]
-============================
-SOLANA WALLET: ${parsedWallets.solanaAddress}
-NEAR WALLET: ${parsedWallets.nearAddress}
-STATUS: VERIFIED ✓
-
-[PROCEEDING TO NEXT STEP]
->Type "help" to see available commands`,
+          content: PROTOCOL_MESSAGES.WALLET_VALIDATION.COMPLETE,
           timestamp: Date.now(),
         });
+        
         setIsLoading(false);
         setIsTyping(false);
         return;
@@ -1063,13 +1034,6 @@ STATUS: VERIFIED ✓
       });
     }
   };
-
-  // Add effect to check for existing code when reaching stage 9
-  useEffect(() => {
-    if (sessionStage === SessionStage.REFERENCE_CODE && session?.user?.id) {
-      checkExistingCode(session.user.id);
-    }
-  }, [sessionStage, session?.user?.id,]);
 
   return {
     messages,

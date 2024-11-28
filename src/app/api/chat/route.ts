@@ -26,9 +26,7 @@ import { AIResponse, ChatResponse } from '@/types/chat';
 import { 
   validateSolanaAddress, 
   validateNearAddress, 
-  parseWalletCommand, 
-  verifyWalletTransaction,
-  verifyTransactionHash
+  parseWalletCommand
 } from '@/lib/walletValidator';
 import { STAGE_PROMPTS } from '@/constants/prompts';
 import { Redis } from 'ioredis';  
@@ -545,128 +543,38 @@ ${currentStageMessage}`,
         });
       }
 
-      const currentSession = await SessionManager.getSession(session.user.id);
-      
-      // Check if they're at a later stage
-      if (currentSession && currentSession.stage > SessionStage.WALLET_SUBMIT) {
-        const currentStageMessage = getStageMessage(currentSession.stage);
-        return NextResponse.json({
-          message: `[CURRENT PROTOCOL STAGE]
-=============================
-${currentStageMessage}`,
-          shouldAutoScroll: true
-        });
-      }
-
-      // Check if they're at an earlier stage
-      if (!currentSession || currentSession.stage < SessionStage.WALLET_SUBMIT) {
-        return NextResponse.json({
-          message: ERROR_MESSAGES.PREVIOUS_STEPS
-        });
-      }
-
-      // Parse wallet addresses
       const parsedWallets = parseWalletCommand(message);
       if (!parsedWallets) {
         return NextResponse.json({
-          message: `[WALLET FORMAT ERROR]
-=============================
-${WALLET_ERROR_MESSAGES.GENERAL.INVALID}
-
-CORRECT FORMAT:
-wallet <solana-address> <near-address>
-
-EXAMPLES:
-1. Solana: 7v91N7iZ9mNicL8WfG6cgSCKyRXydQjLh6UYBWwm6y1Q
-2. NEAR: username.near or username.testnet
-
-Please try again with valid addresses.`
+          message: WALLET_ERROR_MESSAGES.GENERAL.SYNTAX
         });
       }
 
-      try {
-        // Validate both addresses concurrently
-        const [solanaValidation, nearValidation] = await Promise.all([
-          validateSolanaAddress(parsedWallets.solanaAddress),
-          validateNearAddress(parsedWallets.nearAddress)
-        ]);
+      // Validate addresses
+      const solanaValidation = validateSolanaAddress(parsedWallets.solanaAddress);
+      const nearValidation = validateNearAddress(parsedWallets.nearAddress);
 
-        // Check Solana validation
-        if (!solanaValidation.isValid) {
-          return NextResponse.json({
-            message: `[SOLANA VALIDATION ERROR]
-=============================
-${solanaValidation.error}
-
-Please provide a valid Solana address.`
-          });
-        }
-
-        // Check NEAR validation
-        if (!nearValidation.isValid) {
-          return NextResponse.json({
-            message: `[NEAR VALIDATION ERROR]
-=============================
-${nearValidation.error}
-
-Please provide a valid NEAR address.`
-          });
-        }
-
-        // Add hash verification
-        const [solanaHashVerification, nearHashVerification] = await Promise.all([
-          verifyTransactionHash(parsedWallets.solanaAddress, parsedWallets.solanaHash, 'solana'),
-          verifyTransactionHash(parsedWallets.nearAddress, parsedWallets.nearHash, 'near')
-        ]);
-
-        if (!solanaHashVerification.isValid) {
-          return NextResponse.json({
-            message: `[SOLANA HASH VERIFICATION ERROR]
-=============================
-${solanaHashVerification.error}
-
-Please ensure your Solana wallet has valid transactions.`
-          });
-        }
-
-        if (!nearHashVerification.isValid) {
-          return NextResponse.json({
-            message: `[NEAR HASH VERIFICATION ERROR]
-=============================
-${nearHashVerification.error}
-
-Please ensure your NEAR wallet has valid transactions.`
-          });
-        }
-
-        // Store wallet addresses, hashes, and update stage
-        await SessionManager.updateSessionStage(
-          session.user.id, 
-          SessionStage.REFERENCE_CODE,
-          {
-            solanaWallet: parsedWallets.solanaAddress,
-            nearWallet: parsedWallets.nearAddress,
-            solanaHash: solanaHashVerification.hash,
-            nearHash: nearHashVerification.hash
-          }
-        );
-
+      if (!solanaValidation.isValid) {
         return NextResponse.json({
-          message: PROTOCOL_MESSAGES.WALLET_VALIDATION.COMPLETE,
-          commandComplete: true,
-          shouldAutoScroll: true,
-          newStage: SessionStage.REFERENCE_CODE
-        });
-      } catch (error) {
-        console.error('Wallet verification error:', error);
-        return NextResponse.json({
-          message: `[WALLET VERIFICATION ERROR]
-=============================
-${WALLET_ERROR_MESSAGES.GENERAL.NETWORK_ERROR}
-
-Please try again later.`
+          message: solanaValidation.error
         });
       }
+
+      if (!nearValidation.isValid) {
+        return NextResponse.json({
+          message: nearValidation.error
+        });
+      }
+
+      // Both addresses are valid, proceed to next stage
+      await SessionManager.updateSessionStage(session.user.id, SessionStage.REFERENCE_CODE);
+      
+      return NextResponse.json({
+        message: PROTOCOL_MESSAGES.WALLET_VALIDATION.COMPLETE,
+        commandComplete: true,
+        shouldAutoScroll: true,
+        newStage: SessionStage.REFERENCE_CODE
+      });
     }
 
     // Handle reference code commands

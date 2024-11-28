@@ -11,8 +11,6 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
  const [isVisible, setIsVisible] = useState(false);
  const [scanLine, setScanLine] = useState(0);
  const [hasCopied, setHasCopied] = useState(false);
- const [copyError, setCopyError] = useState(false);
- const [errorTimer, setErrorTimer] = useState(5);
   useEffect(() => {
    if (isOpen) {
      setIsVisible(true);
@@ -25,28 +23,13 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
      return () => clearTimeout(timer);
    }
  }, [isOpen]);
-  useEffect(() => {
-   let interval: NodeJS.Timeout;
-   if (copyError && errorTimer > 0) {
-     interval = setInterval(() => {
-       setErrorTimer((prev) => prev - 1);
-     }, 1000);
-   } else if (errorTimer === 0) {
-     setCopyError(false);
-     setErrorTimer(5);
-   }
-   return () => clearInterval(interval);
- }, [copyError, errorTimer]);
   const handleCopy = async () => {
    try {
      await navigator.clipboard.writeText(code);
      setHasCopied(true);
-     setCopyError(false);
-     setErrorTimer(5);
    } catch (err) {
      console.error('Failed to copy:', err);
-     setCopyError(true);
-     setHasCopied(false);
+     setHasCopied(true);
    }
  };
   if (!isVisible) return null;
@@ -114,38 +97,25 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
            <div className="text-xs font-['IBM_Plex_Mono'] text-red-600 text-center tracking-[0.15em]
                          drop-shadow-[0_0_6px_rgba(153,27,27,0.4)]
                          animate-pulse">
-             {copyError ? (
-               <span className="text-red-500">
-                 COPY FAILED. PLEASE WAIT {errorTimer}s BEFORE TRYING AGAIN...
-               </span>
-             ) : (
-               <span className="text-red-600">
-                 CLICK CODE TO COPY OR USE COPY BUTTON
-               </span>
-             )}
+             CLICK CODE TO COPY OR USE COPY BUTTON
            </div>
          </div>
           {/* Actions */}
          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-red-800/50">
            <button
              onClick={handleCopy}
-             disabled={copyError}
-             className={`group px-4 py-2 border-2 text-sm tracking-[0.2em] font-['IBM_Plex_Mono']
-                      transition-all duration-200 relative overflow-hidden
-                      focus:outline-none focus:ring-2 focus:ring-red-800/50
-                      ${copyError 
-                        ? 'bg-red-950/10 border-red-900/30 text-red-900/30 cursor-not-allowed' 
-                        : 'bg-red-950/40 border-red-800/70 text-red-800 hover:bg-red-900/50 hover:border-red-700/80 hover:text-red-700'
-                      }`}
+             className="group px-4 py-2 bg-red-950/40 border-2 border-red-800/70 text-red-800
+                      hover:bg-red-900/50 hover:border-red-700/80 hover:text-red-700
+                      transition-all duration-200 font-['IBM_Plex_Mono'] text-sm tracking-[0.2em]
+                      shadow-[0_0_20px_rgba(153,27,27,0.3)]
+                      hover:shadow-[0_0_25px_rgba(153,27,27,0.4)]
+                      relative overflow-hidden
+                      focus:outline-none focus:ring-2 focus:ring-red-800/50"
            >
-             <span className="relative z-10">
-               [{copyError ? `WAIT ${errorTimer}s` : hasCopied ? 'COPIED!' : 'COPY CODE'}]
-             </span>
-             {!copyError && (
-               <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
-                             transform translate-x-[-100%] group-hover:translate-x-[100%]
-                             transition-transform duration-1000" />
-             )}
+             <span className="relative z-10">[{hasCopied ? 'COPIED!' : 'COPY CODE'}]</span>
+             <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
+                           transform translate-x-[-100%] group-hover:translate-x-[100%]
+                           transition-transform duration-1000" />
            </button>
            <button
              onClick={onClose}

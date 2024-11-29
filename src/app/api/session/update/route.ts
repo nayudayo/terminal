@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { SessionManager } from '@/lib/sessionManager';
 import { SessionStage } from '@/types/session';
 import { type NextRequest } from 'next/server'
-import { TwitterApi } from 'twitter-api-v2'
+import { TwitterApi, ApiResponseError } from 'twitter-api-v2'
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,21 +44,22 @@ export async function POST(request: NextRequest) {
 
     try {
       const tweet = await client.v2.tweet(tweetId)
-      // Process tweet update logic here
       return NextResponse.json({ success: true, tweet })
-    } catch (twitterError: any) {
-      if (twitterError.code === 400) {
-        return NextResponse.json(
-          { error: 'Tweet not found or inaccessible' },
-          { status: 404 }
-        )
-      }
-      
-      if (twitterError.code === 429) {
-        return NextResponse.json(
-          { error: 'Rate limit exceeded. Please try again later.' },
-          { status: 429 }
-        )
+    } catch (twitterError: unknown) {
+      if (twitterError instanceof ApiResponseError) {
+        if (twitterError.code === 400) {
+          return NextResponse.json(
+            { error: 'Tweet not found or inaccessible' },
+            { status: 404 }
+          )
+        }
+        
+        if (twitterError.code === 429) {
+          return NextResponse.json(
+            { error: 'Rate limit exceeded. Please try again later.' },
+            { status: 429 }
+          )
+        }
       }
 
       throw twitterError

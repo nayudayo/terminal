@@ -59,24 +59,20 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
   const handleShare = () => {
     try {
       // Prepare the tweet text
-      const tweetText = `
-      Generated Code: ${code}\nPUSH Rating: ${pushRating} 🔥`;
-      const hashtags = 'CodeGeneration,AI';
+      const tweetText = `PUSH Rating: ${pushRating} 🔥\nReferral: ${code}\n`;
       
       // Create Twitter Web Intent URL
       const twitterUrl = new URL('https://twitter.com/intent/tweet');
       
       // Add parameters
       twitterUrl.searchParams.append('text', tweetText);
-      twitterUrl.searchParams.append('hashtags', hashtags);
+      twitterUrl.searchParams.append('via', 'pushbuttonlol');
       twitterUrl.searchParams.append('url', window.location.href);
-      // Optional: Add via parameter
-      // twitterUrl.searchParams.append('via', 'YourTwitterHandle');
 
       // Open Twitter Web Intent in a popup window
       window.open(
         twitterUrl.toString(),
-        'Share on Twitter',
+        'Share on X',
         'width=550,height=420,scrollbars=yes'
       );
 

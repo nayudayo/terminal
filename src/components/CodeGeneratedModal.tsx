@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { toPng } from 'html-to-image';
+
 interface CodeGeneratedModalProps {
  isOpen: boolean;
  onClose: () => void;
@@ -11,7 +13,8 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
  const [isVisible, setIsVisible] = useState(false);
  const [scanLine, setScanLine] = useState(0);
  const [hasCopied, setHasCopied] = useState(false);
- const [pushRating] = useState(() => Math.floor(Math.random() * 100) + 1);
+ const [pushRating] = useState(() => Math.floor(Math.random() * 69420) + 1);
+ const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
    if (isOpen) {
@@ -52,9 +55,40 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
     return 'text-4xl';
   };
 
+  // New function to handle sharing
+  const handleShare = () => {
+    try {
+      // Prepare the tweet text
+      const tweetText = `
+      Generated Code: ${code}\nPUSH Rating: ${pushRating} 🔥`;
+      const hashtags = 'CodeGeneration,AI';
+      
+      // Create Twitter Web Intent URL
+      const twitterUrl = new URL('https://twitter.com/intent/tweet');
+      
+      // Add parameters
+      twitterUrl.searchParams.append('text', tweetText);
+      twitterUrl.searchParams.append('hashtags', hashtags);
+      twitterUrl.searchParams.append('url', window.location.href);
+      // Optional: Add via parameter
+      // twitterUrl.searchParams.append('via', 'YourTwitterHandle');
+
+      // Open Twitter Web Intent in a popup window
+      window.open(
+        twitterUrl.toString(),
+        'Share on Twitter',
+        'width=550,height=420,scrollbars=yes'
+      );
+
+      setHasCopied(true);
+    } catch (err) {
+      console.error('Failed to share:', err);
+    }
+  };
+
   if (!isVisible) return null;
   return (
-   <div 
+   <div ref={modalRef} 
      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm
        transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
    >
@@ -121,13 +155,13 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
            <div className="text-xs font-['IBM_Plex_Mono'] text-red-600 text-center tracking-[0.15em]
                          drop-shadow-[0_0_6px_rgba(153,27,27,0.4)]
                          animate-pulse">
-             CLICK CODE TO COPY OR USE COPY BUTTON
+             SPREAD THE WORD
            </div>
          </div>
           {/* Actions */}
          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-red-800/50">
            <button
-             onClick={handleCopy}
+             onClick={handleShare}
              className="group px-4 py-2 bg-red-950/40 border-2 border-red-800/70 text-red-800
                       hover:bg-red-900/50 hover:border-red-700/80 hover:text-red-700
                       transition-all duration-200 font-['IBM_Plex_Mono'] text-sm tracking-[0.2em]
@@ -136,7 +170,9 @@ export default function CodeGeneratedModal({ isOpen, onClose, code }: CodeGenera
                       relative overflow-hidden
                       focus:outline-none focus:ring-2 focus:ring-red-800/50"
            >
-             <span className="relative z-10">[{hasCopied ? 'COPIED!' : 'COPY CODE'}]</span>
+             <span className="relative z-10">
+               [{hasCopied ? 'SHARED!' : 'SHARE ON X'}]
+             </span>
              <div className="absolute inset-0 bg-gradient-to-r from-red-950/0 via-red-950/30 to-red-950/0
                            transform translate-x-[-100%] group-hover:translate-x-[100%]
                            transition-transform duration-1000" />

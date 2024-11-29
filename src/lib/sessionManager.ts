@@ -149,7 +149,10 @@ export class SessionManager {
       const stagePrompt = STAGE_PROMPTS[currentStage];
       if (!stagePrompt) {
         console.warn(`[Stage Transition] No prompt found for stage ${currentStage}`);
-        return { response: "ERROR: Invalid stage" };
+        return { 
+          newStage: SessionStage.INTRO_MESSAGE,
+          response: STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0]
+        };
       }
 
       switch (currentStage) {
@@ -261,21 +264,22 @@ export class SessionManager {
         default:
           console.log(`[Stage Transition] No specific transition for stage ${currentStage}`);
           return {
-            response: stagePrompt.example_responses[
-              Math.floor(Math.random() * stagePrompt.example_responses.length)
-            ]
+            newStage: SessionStage.INTRO_MESSAGE,
+            response: STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0]
           };
       }
 
-      console.log(`[Stage Transition] No transition matched, using default response`);
+      console.log(`[Stage Transition] No transition matched, returning INTRO_MESSAGE`);
       return {
-        response: stagePrompt.example_responses[
-          Math.floor(Math.random() * stagePrompt.example_responses.length)
-        ]
+        newStage: SessionStage.INTRO_MESSAGE,
+        response: STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0]
       };
     } catch (error) {
       console.error(`[Stage Transition Failed] Error:`, error);
-      return { response: "ERROR: Stage transition failed" };
+      return { 
+        newStage: SessionStage.INTRO_MESSAGE,
+        response: STAGE_PROMPTS[SessionStage.INTRO_MESSAGE].example_responses[0]
+      };
     }
   }
 

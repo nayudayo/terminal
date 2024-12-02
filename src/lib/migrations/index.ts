@@ -48,6 +48,30 @@ const migrations: Migration[] = [
         DROP TABLE IF EXISTS referral_codes;
       `);
     }
+  },
+  {
+    version: 2,
+    name: 'add_wallet_submissions',
+    up: async (db: Database) => {
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS wallet_submissions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          twitter_id TEXT UNIQUE NOT NULL,
+          solana_address TEXT NOT NULL,
+          near_address TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (twitter_id) REFERENCES user_sessions(twitter_id)
+        );
+
+        CREATE INDEX idx_wallet_submissions_twitter_id 
+        ON wallet_submissions(twitter_id);
+      `);
+    },
+    down: async (db: Database) => {
+      await db.exec(`
+        DROP TABLE IF EXISTS wallet_submissions;
+      `);
+    }
   }
 ];
 

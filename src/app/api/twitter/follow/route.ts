@@ -1,24 +1,26 @@
 import { NextResponse } from 'next/server';
 import { TwitterApi } from 'twitter-api-v2';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../auth/[...nextauth]/auth';
 
 export async function POST(request: Request) {
   try {
     console.log('[Twitter Follow API] Starting follow process');
     
-    // Initialize with OAuth 1.0a credentials
-    const client = new TwitterApi({
-      appKey: process.env.TWITTER_CONSUMER_KEY!,
-      appSecret: process.env.TWITTER_CONSUMER_SECRET!,
-      accessToken: process.env.TWITTER_ACCESS_TOKEN!,
-      accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET!,
-    });
+    // Get the user's session
+    const session = await getServerSession(authOptions);
+    if (!session?.accessToken) {
+      console.error('[Twitter Follow API] No access token found in session');
+      return NextResponse.json(
+        { error: 'Unauthorized - No access token found' },
+        { status: 401 }
+      );
+    }
 
-    console.log('[Twitter Follow API] Client initialized with:', {
-      hasAppKey: !!process.env.TWITTER_CONSUMER_KEY,
-      hasAppSecret: !!process.env.TWITTER_CONSUMER_SECRET,
-      hasAccessToken: !!process.env.TWITTER_ACCESS_TOKEN,
-      hasAccessSecret: !!process.env.TWITTER_ACCESS_TOKEN_SECRET
-    });
+    // Initialize with user's OAuth 2.0 access token
+    const client = new TwitterApi(session.accessToken as string);
+
+    console.log('[Twitter Follow API] Client initialized with user access token');
 
     // Use PTB_TWITTER_ID from environment variables
     const targetUserId = process.env.PTB_TWITTER_ID;

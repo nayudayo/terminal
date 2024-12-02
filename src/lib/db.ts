@@ -46,6 +46,14 @@ export async function initDb() {
           post_push_message_shown BOOLEAN DEFAULT FALSE,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS wallet_submissions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          twitter_id TEXT NOT NULL,
+          solana_address TEXT NOT NULL,
+          near_address TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
       `);
     } catch (error) {
       console.error('Database initialization error:', error);
@@ -143,10 +151,64 @@ export async function createUserMapping(originalUserId: string) {
   ).run(originalUserId);
 }
 
-// Make sure the database is closed when the process exits
-process.on('exit', () => {
-  closeDb();
-});
+export async function storeWalletSubmission(
+  twitterId: string,
+  solanaAddress: string,
+  nearAddress: string
+): Promise<void> {
+  const db = await initDb();
+  try {
+    // Check if user exists in user_sessions
+    const user = await db.prepare(
+      'SELECT twitter_id FROM user_sessions WHERE twitter_id = ?'
+    ).get(twitterId);
+
+    if (!user) {
+      throw new Error('User not found in database');
+    }
+
+    // Store the wallet submission
+    await db.prepare(`
+      INSERT INTO wallet_submissions (
+        twitter_id,
+        solana_address,
+        near_address
+      ) VALUES (?, ?, ?)
+    `).run(
+      twitterId,
+      solanaAddress,
+      nearAddress
+    );
+  } catch (error) {
+    console.error('Error storing wallet submission:', error);
+    throw error;
+  }
+}
+
+export async function getWalletSubmission(twitterId: string): Promise<{
+  solanaAddress: string;
+  nearAddress: string;
+} | null> {
+  const db = await initDb();
+  try {
+    const result = await db.prepare(`
+      SELECT solana_address, near_address 
+      FROM wallet_submissions 
+      WHERE twitter_id = ?
+    `).get(twitterId) as { 
+      solana_address: string; 
+      near_address: string; 
+    } | undefined;
+
+    return result ? {
+      solanaAddress: result.solana_address,
+      nearAddress: result.near_address
+    } : null;
+  } catch (error) {
+    console.error('Error retrieving wallet submission:', error);
+    return null;
+  }
+}
 
 export async function getReferralCode(twitterId: string): Promise<string | null> {
   const db = await initDb();
@@ -161,3 +223,8 @@ export async function getReferralCode(twitterId: string): Promise<string | null>
     return null;
   }
 } 
+
+// Make sure the database is closed when the process exits
+process.on('exit', () => {
+  closeDb();
+});

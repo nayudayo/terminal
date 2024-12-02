@@ -79,6 +79,22 @@ export function validateNearAddress(address: string): ValidationResult {
   return { isValid: true };
 }
 
+export function validateWallets(solanaAddress: string, nearAddress: string): ValidationResult {
+  // Validate Solana address
+  const solanaResult = validateSolanaAddress(solanaAddress);
+  if (!solanaResult.isValid) {
+    return solanaResult;
+  }
+
+  // Validate NEAR address
+  const nearResult = validateNearAddress(nearAddress);
+  if (!nearResult.isValid) {
+    return nearResult;
+  }
+
+  return { isValid: true };
+}
+
 export function parseWalletCommand(command: string): { 
   solanaAddress: string; 
   nearAddress: string; 
